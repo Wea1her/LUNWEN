@@ -1,6 +1,6 @@
 {
   "env": {
-    "ANTHROPIC_AUTH_TOKEN": "sk-gRtVVN0GDtUFYGMpfkvTd6mSsHHfesunqXSITO0GlTorZgjT",
+    "ANTHROPIC_AUTH_TOKEN": "sk-FnY1OaSLbt7PxjPPjcFLDn2Jjb0RIBKvaxp7eRMPhwW1OgEb",
     "ANTHROPIC_BASE_URL": "https://a-ocnfniawgw.cn-shanghai.fcapp.run",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
   },

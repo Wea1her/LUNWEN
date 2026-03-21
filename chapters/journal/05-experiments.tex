@@ -1,0 +1,96 @@
+% chapters/journal/05-experiments.tex
+% 第5章 实验设计与分析
+
+\section{实验设计与分析}
+
+\subsection{仿真环境}
+
+本文构建了一个可配置的通用交易排序仿真环境，用于模拟以太坊区块构建过程。与直接使用以太坊测试网或 Geth 私链相比，仿真环境具有两方面优势：一是训练效率高，单次区块构建回合的仿真时间在毫秒级别，可支持大规模并行采样；二是参数可控，能够精确调节候选交易池规模、风险交易比例等关键变量，便于设计对照实验。环境的核心参数如表~\ref{tab:env_params} 所示。
+
+\begin{table}[htbp]
+\centering
+\caption{仿真环境参数配置}
+\label{tab:env_params}
+\begin{tabular}{lll}
+\toprule
+参数 & 符号 & 取值 \\
+\midrule
+区块 Gas 上限 & $G_{\max}$ & 30{,}000{,}000 \\
+候选交易池大小 & $N$ & 50--200 \\
+交易 Gas 消耗范围 & $g_i$ & 21{,}000--500{,}000 \\
+手续费分布 & -- & 对数正态分布 \\
+风险交易比例 & $p_{\text{risk}}$ & 5\%--30\% \\
+交易到达时间 & $t_i^{\text{arr}}$ & 泊松过程 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+仿真环境在每个回合开始时，从预设分布中采样生成候选交易集合。每笔交易的手续费参数服从对数正态分布，以模拟实际以太坊交易手续费的右偏特征。Gas 消耗根据交易类型确定：简单转账交易固定为 21{,}000 Gas，合约调用交易从 $[50{,}000, 500{,}000]$ 区间均匀采样。交易到达时间由泊松过程生成，平均到达间隔设为 1 秒。
+
+风险交易按预设比例 $p_{\text{risk}}$ 注入候选集合。风险交易的风险评分从均匀分布 $U(0.5, 1.0)$ 中采样，普通交易的风险评分从 $U(0, 0.3)$ 中采样，两类交易在风险评分上存在明显的分布差异。风险交易的手续费通常偏高，以模拟实际场景中 MEV 攻击交易通过提高手续费争取优先打包的行为。环境支持调节 $p_{\text{risk}}$ 以模拟不同风险负载场景，从低风险（$p_{\text{risk}} = 5\%$）到高风险（$p_{\text{risk}} = 30\%$）。
+
+交易间的依赖关系通过 Nonce 约束建模：同一发送地址的多笔交易必须按 Nonce 从小到大的顺序被选入执行序列。仿真环境在每个时间步自动检查依赖约束，仅将满足约束的交易保留在合法动作集合中。
+
+\subsection{基线方法与评价指标}
+
+本文选取以下三种基线方法进行对比：
+
+（1）FIFO 排序：按交易到达时间顺序依次打包，直至区块 Gas 用尽。该方法不做任何优化，代表了最朴素的公平排序方案。
+
+（2）Gas 优先排序：按交易手续费从高到低排列并依次打包，为当前以太坊客户端的默认排序策略。该方法追求收益最大化，但不考虑公平性和风险。
+
+（3）启发式风险感知排序（Heuristic）：在 Gas 优先排序基础上，对风险评分超过阈值 $\tau_{\text{risk}} = 0.5$ 的交易降低优先级，将其排列在区块中间位置（即非头尾区域）。该方法代表了基于规则的风险感知排序方案。
+
+评价指标包括以下四项。区块手续费收益（Block Fee Revenue）定义为区块内所有交易手续费之和，以 Gwei 为单位，衡量排序策略对区块构建者的经济效益。确认公平性指数（Fairness Index）采用 Jain 公平性指数衡量交易等待时间分布的均匀程度：
+
+\begin{equation}
+  J = \frac{(\sum_{i=1}^K w_i)^2}{K \cdot \sum_{i=1}^K w_i^2}
+\end{equation}
+
+其中 $w_i$ 为第 $i$ 笔被打包交易的等待时间，$K$ 为打包交易总数。$J$ 的取值范围为 $[1/K, 1]$，越接近 1 表示等待时间分布越均匀，排序越公平。风险暴露度（Risk Exposure）定义为风险评分超过 $\tau_{\text{risk}}$ 的交易出现在区块前 10\% 和后 10\% 位置的比例，越低表示高风险交易被放置在敏感位置的可能性越小。Gas 利用率（Gas Utilization）定义为区块实际消耗 Gas 总量占区块 Gas 上限 $G_{\max}$ 的比例，反映区块空间的利用效率。
+
+\subsection{主要实验结果}
+
+表~\ref{tab:main_results} 展示了各方法在默认参数配置（$N=100$，$p_{\text{risk}}=15\%$）下的实验结果。
+
+\begin{table}[htbp]
+\centering
+\caption{各方法在默认配置下的性能对比}
+\label{tab:main_results}
+\begin{tabular}{lcccc}
+\toprule
+方法 & 区块收益 & 公平性指数 & 风险暴露度 & Gas 利用率 \\
+\midrule
+FIFO        & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Gas 优先    & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Heuristic   & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+本文方法    & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\TODO{在实验数据就绪后填入具体数值，并撰写结果分析段落。分析要点：（1）与 Gas 优先相比，本文方法在收益方面的表现；（2）与 FIFO 相比，公平性指标的差异；（3）与 Heuristic 相比，风险暴露度的改善；（4）Gas 利用率是否保持在合理水平。}
+
+\subsection{鲁棒性分析}
+
+为验证本文方法在不同条件下的稳定性，设计了风险负载变化实验。将风险交易比例 $p_{\text{risk}}$ 分别设为 5\%、10\%、15\%、20\% 和 30\%，在每种配置下运行各方法并记录指标。
+
+\begin{table}[htbp]
+\centering
+\caption{不同风险负载下各方法的区块收益与风险暴露度}
+\label{tab:robustness}
+\begin{tabular}{lcccccc}
+\toprule
+\multirow{2}{*}{方法} & \multicolumn{3}{c}{区块收益} & \multicolumn{3}{c}{风险暴露度} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+ & 5\% & 15\% & 30\% & 5\% & 15\% & 30\% \\
+\midrule
+FIFO        & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Gas 优先    & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Heuristic   & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+本文方法    & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\TODO{在实验数据就绪后填入具体数值，并撰写鲁棒性分析段落。重点关注：（1）随风险负载增大，各方法性能变化趋势；（2）本文方法在高风险负载下是否仍保持优势；（3）训练收敛曲线的稳定性。}

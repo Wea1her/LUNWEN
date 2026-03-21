@@ -1,0 +1,66 @@
+% 基于深度强化学习的以太坊交易序列决策排序方法研究
+% 期刊论文 LaTeX 源文件
+% 编译方式：xelatex main.tex && bibtex main && xelatex main.tex && xelatex main.tex
+
+\documentclass[a4paper, 11pt]{ctexart}
+
+% ========== 宏包 ==========
+\usepackage[left=2.5cm, right=2.5cm, top=2.8cm, bottom=2.5cm]{geometry}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{cite}
+\usepackage{url}
+
+% ========== 算法环境中文适配 ==========
+\renewcommand{\algorithmicrequire}{\textbf{输入:}}
+\renewcommand{\algorithmicensure}{\textbf{输出:}}
+
+% ========== 占位标记命令 ==========
+\newcommand{\TODO}[1]{\textcolor{red}{[TODO: #1]}}
+
+% ========== 文档信息 ==========
+\title{基于深度强化学习的以太坊交易序列决策排序方法研究}
+\author{
+  陈庆贺 \quad 张洪豪 \\
+  {\small 天津理工大学 计算机科学与工程学院，天津 300384}
+}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+% 摘要
+\input{00-abstract}
+
+% 第1章 引言
+\input{01-introduction}
+
+% 第2章 相关工作
+\input{02-related-work}
+
+% 第3章 问题建模
+\input{03-problem-modeling}
+
+% 第4章 方法设计
+\input{04-method}
+
+% 第5章 实验设计与分析
+\input{05-experiments}
+
+% 第6章 结论
+\input{06-conclusion}
+
+% 参考文献
+\bibliographystyle{gbt7714-numerical}
+\bibliography{references}
+
+\end{document}

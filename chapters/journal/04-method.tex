@@ -1,0 +1,114 @@
+% chapters/journal/04-method.tex
+% 第4章 方法设计
+
+\section{方法设计}
+
+\subsection{交易特征提取}
+
+对每笔候选交易 $tx_i$，提取 $d$ 维原始特征向量 $\mathbf{x}_i$ 后，通过两层全连接网络编码为稠密表示：
+
+\begin{equation}
+  \mathbf{h}_i = \text{ReLU}(\mathbf{W}_2 \cdot \text{ReLU}(\mathbf{W}_1 \mathbf{x}_i + \mathbf{b}_1) + \mathbf{b}_2)
+\end{equation}
+
+其中 $\mathbf{h}_i \in \mathbb{R}^{d_h}$ 为交易 $tx_i$ 的编码表示，$d_h$ 为隐藏层维度。交易特征编码网络的参数在策略网络训练过程中联合优化。
+
+原始特征向量 $\mathbf{x}_i$ 由三组特征拼接而成。交易基础特征包括归一化手续费、Gas 消耗估计、到达时间戳和交易类型的独热编码。历史统计特征包括发送地址的历史交易成功率和历史确认延迟。风险特征包括基于历史异常行为统计生成的风险评分，该评分综合考虑发送地址参与异常交易（如失败率过高、高频提交）的历史频率。
+
+\subsection{策略网络结构}
+
+本文采用近端策略优化（Proximal Policy Optimization，PPO）\cite{schulman2017ppo}算法训练排序策略。选择 PPO 而非 DQN\cite{mnih2015dqn} 的原因在于：本文的动作空间随候选交易集合的变化而动态改变，传统 DQN 的固定输出维度难以适应这一特性；PPO 基于策略梯度的框架通过对每笔候选交易独立计算选择得分，天然支持变长动作空间。策略网络采用 Actor-Critic 架构，Actor 和 Critic 共享交易特征编码层，在此基础上分别接各自的决策头。
+
+Actor 网络接收状态 $s_t$，对每笔候选交易计算选择得分：
+
+\begin{equation}
+  u_i = \mathbf{w}_a^\top \text{ReLU}(\mathbf{W}_s [\mathbf{h}_i; \mathbf{b}_t] + \mathbf{b}_s)
+\end{equation}
+
+其中 $[\mathbf{h}_i; \mathbf{b}_t]$ 为交易表示与区块状态的拼接向量。选择得分经 softmax 归一化后得到动作概率分布 $\pi_\theta(a|s_t)$。
+
+Critic 网络估计当前状态的价值函数 $V_\psi(s_t)$，用于计算优势函数以降低策略梯度的方差。Critic 网络对所有候选交易表示取均值池化后与区块状态拼接，经两层全连接网络输出标量价值估计：
+
+\begin{equation}
+  V_\psi(s_t) = \mathbf{w}_v^\top \text{ReLU}(\mathbf{W}_v [\bar{\mathbf{h}}_t; \mathbf{b}_t] + \mathbf{b}_v) + b_v
+\end{equation}
+
+其中 $\bar{\mathbf{h}}_t = \frac{1}{|\mathcal{T}_t|}\sum_{tx_i \in \mathcal{T}_t} \mathbf{h}_i$ 为候选交易表示的均值池化。与 Actor 网络需要对每笔交易分别计算得分不同，Critic 网络通过均值池化将变长的候选集合压缩为固定维度的向量，从而输出对当前状态的整体价值估计。
+
+\subsection{合法性掩码机制}
+
+由于候选交易集合的大小在不同时间步动态变化，且部分交易受容量约束和依赖约束限制不可被选取，本文引入合法性掩码（action masking）机制。在计算动作概率分布时，将不属于合法动作集合 $\mathcal{A}_t^{\text{valid}}$ 的交易得分设为负无穷，再进行 softmax 归一化：
+
+\begin{equation}
+  \pi_\theta^{\text{mask}}(a_i|s_t) = \frac{\exp(u_i) \cdot \mathbb{I}(a_i \in \mathcal{A}_t^{\text{valid}})}{\sum_{a_j \in \mathcal{A}_t^{\text{valid}}} \exp(u_j)}
+\end{equation}
+
+该机制确保策略网络仅在合法动作上分配概率，避免生成违反约束的无效排序。
+
+\subsection{训练算法}
+
+训练过程采用 PPO 的截断替代目标函数。在每个训练回合中，智能体与仿真环境交互完成一次完整的区块构建过程，收集轨迹 $\tau = \{(s_t, a_t, r_t, s_{t+1})\}_{t=0}^{T}$。使用广义优势估计（Generalized Advantage Estimation，GAE）计算优势函数：
+
+\begin{equation}
+  \hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda_{\text{GAE}})^l \delta_{t+l}
+\end{equation}
+
+其中 $\delta_t = r_t + \gamma V_\psi(s_{t+1}) - V_\psi(s_t)$ 为时序差分残差，$\gamma$ 为折扣因子，$\lambda_{\text{GAE}}$ 为 GAE 参数。
+
+策略网络的优化目标为 PPO 截断目标：
+
+\begin{equation}
+  L^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[ \min\left( \rho_t \hat{A}_t, \; \text{clip}(\rho_t, 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right]
+\end{equation}
+
+其中 $\rho_t = \pi_\theta(a_t|s_t) / \pi_{\theta_{\text{old}}}(a_t|s_t)$ 为重要性采样比率，$\epsilon$ 为截断参数。Critic 网络通过最小化价值函数的均方误差进行更新：
+
+\begin{equation}
+  L^{\text{value}}(\psi) = \mathbb{E}_t \left[ (V_\psi(s_t) - \hat{R}_t)^2 \right]
+\end{equation}
+
+其中 $\hat{R}_t = \sum_{l=0}^{T-t} \gamma^l r_{t+l}$ 为从时间步 $t$ 开始的折扣累积奖励。训练过程中的主要超参数配置如表~\ref{tab:hyperparams} 所示。
+
+\begin{table}[htbp]
+\centering
+\caption{训练超参数配置}
+\label{tab:hyperparams}
+\begin{tabular}{llc}
+\toprule
+超参数 & 符号 & 取值 \\
+\midrule
+Actor 学习率 & $\alpha_\theta$ & $3 \times 10^{-4}$ \\
+Critic 学习率 & $\alpha_\psi$ & $1 \times 10^{-3}$ \\
+折扣因子 & $\gamma$ & 0.99 \\
+GAE 参数 & $\lambda_{\text{GAE}}$ & 0.95 \\
+PPO 截断参数 & $\epsilon$ & 0.2 \\
+每回合更新轮数 & $E$ & 4 \\
+隐藏层维度 & $d_h$ & 128 \\
+训练回合数 & $M$ & 10{,}000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+训练算法的完整流程如算法~\ref{alg:training} 所示。
+
+\begin{algorithm}[H]
+\caption{基于 PPO 的交易排序策略训练}
+\label{alg:training}
+\begin{algorithmic}[1]
+\REQUIRE 仿真环境 $\text{Env}$, 学习率 $\alpha_\theta, \alpha_\psi$, 截断参数 $\epsilon$
+\ENSURE 训练后的策略参数 $\theta^*$
+\STATE 初始化 Actor 参数 $\theta$, Critic 参数 $\psi$
+\FOR{episode $= 1, 2, \ldots, M$}
+    \STATE 从环境采样候选交易集合 $\mathcal{T}$，初始化区块状态
+    \STATE 收集完整轨迹 $\tau = \{(s_t, a_t, r_t)\}_{t=0}^{T}$
+    \STATE 计算 GAE 优势估计 $\hat{A}_t$
+    \FOR{epoch $= 1, 2, \ldots, E$}
+        \STATE 更新 $\theta \leftarrow \theta + \alpha_\theta \nabla_\theta L^{\text{CLIP}}(\theta)$
+        \STATE 更新 $\psi \leftarrow \psi - \alpha_\psi \nabla_\psi L^{\text{value}}(\psi)$
+    \ENDFOR
+\ENDFOR
+\RETURN $\theta^*$
+\end{algorithmic}
+\end{algorithm}
+
+推理阶段，策略网络对候选交易计算选择得分并施加合法性掩码后，取概率最高的交易作为下一步选择（贪心解码），依次构建完整的区块执行序列。

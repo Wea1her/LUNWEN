@@ -1,0 +1,78 @@
+% chapters/journal/03-problem-modeling.tex
+% 第3章 问题建模
+
+\section{问题建模}
+
+\subsection{区块构建的序列决策过程}
+
+将一次区块构建过程定义为一个马尔可夫决策过程的完整回合（episode）。给定交易池中的待处理交易集合 $\mathcal{T} = \{tx_1, tx_2, \ldots, tx_N\}$ 和区块 Gas 上限 $G_{\max}$，智能体从空区块开始，在每个时间步 $t$ 从剩余候选交易中选取一笔加入区块执行序列，直至满足终止条件。终止条件包括：候选交易集合为空、区块剩余 Gas 容量不足以容纳任何候选交易、已选交易数量达到预设上限、或智能体主动选择终止动作。回合结束时输出区块内交易的完整执行序列 $\sigma = (tx_{\pi(1)}, tx_{\pi(2)}, \ldots, tx_{\pi(K)})$，其中 $K$ 为实际打包的交易数量，$\pi$ 为排列函数。
+
+该建模方式将区块构建视为一个有限时域的序列决策问题。与将整个候选交易集合一次性排序的方法不同，逐笔选择的建模方式允许智能体在每步决策时利用已选交易序列的信息，使后续选择能够考虑前序交易对区块状态的影响。例如，当一笔高 Gas 消耗的交易被选入后，剩余容量的变化会影响后续可选交易的范围；当一笔与特定合约交互的交易被选入后，其他操作同一合约的交易的执行结果可能因状态变化而不同。这种动态信息在一次性排序方法中难以被充分利用。
+
+\subsection{状态空间}
+
+时间步 $t$ 的状态 $s_t$ 由候选交易特征和区块构建状态两部分组成：
+
+\begin{equation}
+  s_t = (\mathbf{F}_t, \mathbf{b}_t)
+\end{equation}
+
+候选交易特征矩阵 $\mathbf{F}_t \in \mathbb{R}^{|\mathcal{T}_t| \times d}$ 描述当前剩余候选交易集合 $\mathcal{T}_t$ 中每笔交易的 $d$ 维特征向量。每笔交易 $tx_i$ 的特征向量 $\mathbf{f}_i$ 包含以下分量：交易手续费参数（maxPriorityFeePerGas 或 gasPrice）、Gas 消耗估计 $g_i$、到达时间戳 $t_i^{\text{arr}}$、交易类型编码、以及基于历史数据统计的风险评分 $r_i^{\text{risk}}$。
+
+区块构建状态向量 $\mathbf{b}_t$ 包含：区块剩余 Gas 容量 $g_t^{\text{rem}} = G_{\max} - \sum_{j<t} g_{\pi(j)}$、已选交易数量 $k_t$、已累计手续费收益 $R_t^{\text{fee}}$、以及已选交易序列的特征摘要向量 $\mathbf{h}_t^{\text{seq}}$。其中 $\mathbf{h}_t^{\text{seq}}$ 通过对已选交易特征取均值池化获得。
+
+\subsection{动作空间}
+
+在时间步 $t$，动作空间定义为当前候选交易集合与终止动作的并集：
+
+\begin{equation}
+  \mathcal{A}_t = \mathcal{T}_t \cup \{\texttt{STOP}\}
+\end{equation}
+
+为保证动作的合法性，对候选交易施加以下过滤规则，生成合法动作集合 $\mathcal{A}_t^{\text{valid}}$：
+
+（1）容量约束：候选交易的 Gas 消耗估计不超过区块剩余容量，即 $g_i \leq g_t^{\text{rem}}$。
+
+（2）依赖约束：候选交易的前置依赖交易（如同一发送地址的 Nonce 顺序）已全部被选入执行序列。
+
+不满足上述约束的交易从候选集合中移除，策略网络仅在合法动作集合上进行决策。
+
+\subsection{奖励函数}
+
+奖励函数设计为手续费收益、确认公平性和风险抑制三项的加权组合。当智能体在时间步 $t$ 选择交易 $tx_{\pi(t)}$ 时，即时奖励为：
+
+\begin{equation}
+  r_t = \alpha \cdot r_t^{\text{fee}} + \beta \cdot r_t^{\text{fair}} - \gamma \cdot r_t^{\text{risk}}
+\end{equation}
+
+其中 $\alpha, \beta, \gamma$ 为预设权重系数。各分量定义如下：
+
+手续费收益项 $r_t^{\text{fee}}$ 为选中交易的归一化手续费：
+
+\begin{equation}
+  r_t^{\text{fee}} = \frac{\text{fee}(tx_{\pi(t)})}{\max_{tx \in \mathcal{T}} \text{fee}(tx)}
+\end{equation}
+
+确认公平性项 $r_t^{\text{fair}}$ 衡量交易等待时间的合理性，等待时间越长的交易被选中时给予越高的公平性奖励：
+
+\begin{equation}
+  r_t^{\text{fair}} = \frac{t_{\text{now}} - t_{\pi(t)}^{\text{arr}}}{T_{\max}}
+\end{equation}
+
+其中 $T_{\max}$ 为归一化常数。该项鼓励策略适当关注长时间未被确认的交易，避免低手续费交易被无限期搁置。
+
+风险惩罚项 $r_t^{\text{risk}}$ 基于交易的风险评分与位置敏感度的乘积：
+
+\begin{equation}
+  r_t^{\text{risk}} = r_{\pi(t)}^{\text{risk}} \cdot \phi(t, K)
+\end{equation}
+
+其中 $r_{\pi(t)}^{\text{risk}}$ 为交易的风险评分，$\phi(t, K)$ 为位置敏感度函数，在区块头部和尾部位置取较高值（这些位置对抢跑和尾随攻击更为敏感），在中间位置取较低值。具体地，$\phi(t, K)$ 定义为：
+
+\begin{equation}
+  \phi(t, K) = 1 - \frac{4t(K-t)}{K^2}
+\end{equation}
+
+该函数在 $t=0$（区块首位）和 $t=K$（区块末位）处取值为 1，在 $t=K/2$（区块中间）处取最小值 0，形成 U 形分布。这一设计的动机在于：抢跑攻击通常依赖攻击交易被放置在目标交易之前（即区块靠前位置），而尾随攻击则依赖攻击交易紧随目标交易之后（即区块靠后位置）。将高风险交易排列在区块中间位置可以降低其被利用为攻击工具的可能性。
+
+奖励函数中三个权重系数 $\alpha$、$\beta$、$\gamma$ 控制了收益、公平性和风险抑制之间的相对重要性。在本文的实验配置中，默认取 $\alpha = 1.0$、$\beta = 0.3$、$\gamma = 0.5$。收益项权重最大，保证策略不会过度牺牲区块手续费收入；公平性项和风险项作为辅助目标，引导策略在维持收益水平的同时兼顾确认公平性和排序安全性。
