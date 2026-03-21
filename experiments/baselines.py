@@ -1,0 +1,85 @@
+"""基线排序方法: FIFO, Gas 优先, 启发式风险感知"""
+
+from __future__ import annotations
+from typing import List
+
+import config as C
+from transaction import Transaction
+
+
+def _apply_nonce_order(txs: List[Transaction]) -> List[Transaction]:
+    """保证同地址交易按 nonce 顺序, 在原有排序基础上做拓扑修正"""
+    selected: List[Transaction] = []
+    remaining = list(txs)
+    selected_nonces: dict[int, int] = {}  # sender -> max selected nonce
+    gas_left = C.MAX_BLOCK_GAS
+
+    while remaining:
+        progress = False
+        next_remaining = []
+        for tx in remaining:
+            # 容量检查
+            if tx.gas > gas_left:
+                next_remaining.append(tx)
+                continue
+            # Nonce 依赖检查
+            if tx.nonce > 0:
+                prev = selected_nonces.get(tx.sender, -1)
+                if prev < tx.nonce - 1:
+                    next_remaining.append(tx)
+                    continue
+            # 可选
+            selected.append(tx)
+            gas_left -= tx.gas
+            selected_nonces[tx.sender] = max(
+                selected_nonces.get(tx.sender, -1), tx.nonce)
+            progress = True
+        remaining = next_remaining
+        if not progress:
+            break
+    return selected
+
+
+def fifo_sort(pool: List[Transaction]) -> List[Transaction]:
+    """按到达时间排序"""
+    ordered = sorted(pool, key=lambda tx: tx.arrival_time)
+    return _apply_nonce_order(ordered)
+
+
+def gas_priority_sort(pool: List[Transaction]) -> List[Transaction]:
+    """按手续费从高到低排序"""
+    ordered = sorted(pool, key=lambda tx: -tx.fee)
+    return _apply_nonce_order(ordered)
+
+
+def heuristic_sort(pool: List[Transaction],
+                   risk_threshold: float = C.HEURISTIC_RISK_THRESHOLD
+                   ) -> List[Transaction]:
+    """Gas 优先 + 高风险交易降级到区块中间位置"""
+    normal = [tx for tx in pool if tx.risk_score < risk_threshold]
+    risky = [tx for tx in pool if tx.risk_score >= risk_threshold]
+
+    normal_sorted = sorted(normal, key=lambda tx: -tx.fee)
+    risky_sorted = sorted(risky, key=lambda tx: -tx.fee)
+
+    # 将风险交易插入到中间位置
+    result = list(normal_sorted)
+    mid = len(result) // 2
+    for tx in risky_sorted:
+        result.insert(mid, tx)
+        mid += 1
+
+    return _apply_nonce_order(result)
+
+
+def run_baseline(pool: List[Transaction],
+                 method: str) -> List[Transaction]:
+    """统一接口"""
+    if method == "fifo":
+        return fifo_sort(pool)
+    elif method == "gas":
+        return gas_priority_sort(pool)
+    elif method == "heuristic":
+        return heuristic_sort(pool)
+    else:
+        raise ValueError(f"Unknown baseline: {method}")
