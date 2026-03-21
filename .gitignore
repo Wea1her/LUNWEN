@@ -1,0 +1,4 @@
+# Ignore the virtual environment created for experiments
+
+experiments/.venv/
+
