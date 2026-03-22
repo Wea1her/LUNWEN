@@ -77,9 +77,39 @@ def packing_ratio(selected: List[Transaction],
     return len(selected) / len(pool)
 
 
+def top10_risk_ratio(selected: List[Transaction],
+                     threshold: float = C.HEURISTIC_RISK_THRESHOLD) -> float:
+    """区块前 10% 位置中高风险交易占比"""
+    K = len(selected)
+    if K == 0:
+        return 0.0
+    n_top = max(int(K * 0.1), 1)
+    top_txs = selected[:n_top]
+    risky_count = sum(1 for tx in top_txs if tx.risk_score >= threshold)
+    return risky_count / n_top
+
+
+def late_arrival_promotion_rate(selected: List[Transaction],
+                                pool: List[Transaction]) -> float:
+    """后到达高手续费交易被提前打包的比例"""
+    if not pool or not selected:
+        return 0.0
+    median_arrival = float(np.median([tx.arrival_time for tx in pool]))
+    median_fee = float(np.median([tx.fee for tx in pool]))
+    # 后到达且高手续费的交易
+    late_high = [tx for tx in pool
+                 if tx.arrival_time > median_arrival and tx.fee > median_fee]
+    if not late_high:
+        return 0.0
+    K = len(selected)
+    top_half_tids = {selected[i].tid for i in range(K // 2)}
+    promoted = sum(1 for tx in late_high if tx.tid in top_half_tids)
+    return promoted / len(late_high)
+
+
 def compute_all_metrics(selected: List[Transaction],
                         pool: List[Transaction]) -> dict:
-    """计算全部六项指标"""
+    """计算全部八项指标"""
     t_now = max(tx.arrival_time for tx in pool) + 1.0 if pool else 1.0
     return {
         "block_fee": block_fee_revenue(selected),
@@ -88,4 +118,6 @@ def compute_all_metrics(selected: List[Transaction],
         "gas_util": gas_utilization(selected),
         "risky_rank": avg_risky_rank(selected),
         "packing_ratio": packing_ratio(selected, pool),
+        "top10_risk": top10_risk_ratio(selected),
+        "late_promo": late_arrival_promotion_rate(selected, pool),
     }

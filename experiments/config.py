@@ -20,6 +20,7 @@ RISK_FEE_MULTIPLIER = 2.0    # 风险交易手续费倍率
 ALPHA = 1.0   # 手续费收益权重
 BETA = 0.3    # 确认公平性权重
 GAMMA_R = 0.5 # 风险惩罚权重
+ETA = 0.1     # 提前停止惩罚权重
 
 # ========== 网络结构 ==========
 TX_FEATURE_DIM = 8       # 交易原始特征维度
@@ -53,3 +54,5 @@ FAIR_LAMBDA_W = 0.5      # Fair-Fee 双目标: 等待时间权重
 # ========== 多种子与鲁棒性 ==========
 SEEDS = [42, 123, 456, 789, 2025]
 ROBUSTNESS_RISK_RATIOS = [0.05, 0.10, 0.15, 0.20, 0.30]
+ROBUSTNESS_POOL_SIZES = [100, 200, 300, 500]
+ROBUSTNESS_FEE_MULTIPLIERS = [1.2, 1.5, 2.0, 3.0]

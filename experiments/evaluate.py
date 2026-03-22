@@ -95,6 +95,85 @@ def run_robustness(model, device, n_episodes, pool_size, seed,
     return all_data
 
 
+def run_pool_size_robustness(model, device, n_episodes, risk_ratio, seed,
+                             output_dir="results"):
+    """不同候选池规模下的鲁棒性实验"""
+    pool_sizes = C.ROBUSTNESS_POOL_SIZES
+    all_data = {}
+    print("\n===== 候选池规模鲁棒性 =====")
+    for ps in pool_sizes:
+        env = TxOrderingEnv(pool_size=ps, risk_ratio=risk_ratio, seed=seed)
+        results = {}
+        results["RL"] = aggregate(evaluate_rl(model, env, n_episodes, device))
+        for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
+            results[bl] = aggregate(evaluate_baseline(bl, env, n_episodes))
+        print(f"\n--- pool_size = {ps} ---")
+        print_table(results)
+        all_data[str(ps)] = results
+
+    path = os.path.join(output_dir, "robustness_pool_size.json")
+    with open(path, "w") as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+    print(f"池大小鲁棒性结果已保存: {path}")
+    return all_data
+
+
+def run_fee_multiplier_robustness(model, device, n_episodes, pool_size, seed,
+                                  output_dir="results"):
+    """不同风险费率倍率下的鲁棒性实验"""
+    from transaction import generate_pool
+    multipliers = C.ROBUSTNESS_FEE_MULTIPLIERS
+    all_data = {}
+    print("\n===== 风险费率倍率鲁棒性 =====")
+    for mult in multipliers:
+        # 临时修改倍率, 通过自定义交易池实现
+        env = TxOrderingEnv(pool_size=pool_size, risk_ratio=C.RISK_RATIO,
+                            seed=seed)
+        results = {}
+        eval_results_rl = []
+        eval_results_bl = {bl: [] for bl in ["fifo", "gas", "heuristic",
+                                              "fee_risk_linear", "fair_fee"]}
+        for _ in range(n_episodes):
+            env.reset()
+            pool = env.get_pool()
+            # 修改风险交易费率倍率
+            for tx in pool:
+                if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD:
+                    tx.fee = tx.fee / C.RISK_FEE_MULTIPLIER * mult
+            env._pool = pool
+            env._candidates = list(pool)
+            env._max_fee = max(tx.fee for tx in pool)
+
+            # RL 评估
+            obs = env._obs()
+            while True:
+                action, _, _ = model.act(obs, device, greedy=True)
+                obs, _, done, _, info = env.step(action)
+                if done:
+                    break
+            sel_rl = env.get_selected_transactions()
+            eval_results_rl.append(compute_all_metrics(sel_rl, pool))
+
+            # 基线评估
+            for bl in eval_results_bl:
+                sel_bl = run_baseline(pool, bl)
+                eval_results_bl[bl].append(compute_all_metrics(sel_bl, pool))
+
+        results["RL"] = aggregate(eval_results_rl)
+        for bl in eval_results_bl:
+            results[bl] = aggregate(eval_results_bl[bl])
+
+        print(f"\n--- fee_multiplier = {mult} ---")
+        print_table(results)
+        all_data[str(mult)] = results
+
+    path = os.path.join(output_dir, "robustness_fee_mult.json")
+    with open(path, "w") as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+    print(f"费率倍率鲁棒性结果已保存: {path}")
+    return all_data
+
+
 def plot_training_curve(log_path: str, save_path: str):
     """绘制训练收敛曲线 (3 子图: 奖励、损失、区块收益)"""
     try:

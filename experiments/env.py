@@ -28,8 +28,10 @@ class TxOrderingEnv(gym.Env):
                  alpha: float = C.ALPHA,
                  beta: float = C.BETA,
                  gamma_r: float = C.GAMMA_R,
+                 eta: float = C.ETA,
                  no_seq_summary: bool = False,
-                 no_stop: bool = False):
+                 no_stop: bool = False,
+                 no_action_mask: bool = False):
         super().__init__()
         self.pool_size = pool_size
         self.risk_ratio = risk_ratio
@@ -38,8 +40,10 @@ class TxOrderingEnv(gym.Env):
         self.alpha = alpha
         self.beta = beta
         self.gamma_r = gamma_r
+        self.eta = eta
         self.no_seq_summary = no_seq_summary
         self.no_stop = no_stop
+        self.no_action_mask = no_action_mask
 
         # 观测 / 动作空间 (用 dict 传递变长数据)
         self.observation_space = spaces.Dict({
@@ -98,8 +102,12 @@ class TxOrderingEnv(gym.Env):
 
         # STOP 动作或无效动作
         if action == stop_idx or action not in valid:
+            # r_valid: 若还有合法候选却选择停止, 施加惩罚
+            stop_penalty = 0.0
+            if action == stop_idx and len(valid) > 0:
+                stop_penalty = -self.eta
             self._done = True
-            return self._obs(), 0.0, True, False, self._info()
+            return self._obs(), stop_penalty, True, False, self._info()
 
         tx = self._candidates[action]
 
@@ -144,17 +152,41 @@ class TxOrderingEnv(gym.Env):
             valid.add(idx)
         return valid
 
+    def _jain_index(self, waits: np.ndarray) -> float:
+        """计算等待时间序列的 Jain 公平性指数"""
+        if len(waits) == 0:
+            return 1.0
+        s = waits.sum()
+        s2 = (waits ** 2).sum()
+        if s2 < 1e-12:
+            return 1.0
+        return float(s ** 2 / (len(waits) * s2))
+
     def _compute_reward(self, tx: Transaction) -> float:
-        """r = α·r_fee + β·r_fair − γ·r_risk"""
+        """r = α·r_fee + β·Δr_fair − γ·r_risk"""
+        # 手续费收益
         r_fee = tx.fee / self._max_fee
-        r_fair = (self._t_now - tx.arrival_time) / self._t_max if self._t_max > 0 else 0.0
 
-        K = len(self._pool)
+        # 增量 Jain 公平性: J(S_t ∪ {tx}) - J(S_t)
+        old_waits = np.array([self._t_now - s.arrival_time
+                              for s in self._selected], dtype=np.float64)
+        new_wait = self._t_now - tx.arrival_time
+        new_waits = np.append(old_waits, new_wait)
+        delta_fair = self._jain_index(new_waits) - self._jain_index(old_waits)
+
+        # 分段式风险惩罚
+        K = max(len(self._pool), 1)
         t = self._step_count
-        phi = 1.0 - 4.0 * t * (K - t) / (K * K) if K > 0 else 1.0
-        r_risk = tx.risk_score * max(phi, 0.0)
+        pos_ratio = t / K
+        if pos_ratio < 0.1 or pos_ratio > 0.9:
+            phi = 1.0      # 头尾 10%: 强惩罚
+        elif 0.4 <= pos_ratio <= 0.6:
+            phi = 0.0      # 中间 40%-60%: 无惩罚
+        else:
+            phi = 0.5      # 其余位置: 中等惩罚
+        r_risk = tx.risk_score * phi
 
-        return self.alpha * r_fee + self.beta * r_fair - self.gamma_r * r_risk
+        return self.alpha * r_fee + self.beta * delta_fair - self.gamma_r * r_risk
 
     def _obs(self) -> dict:
         """构造 padded 观测"""
@@ -187,9 +219,13 @@ class TxOrderingEnv(gym.Env):
 
         # 动作掩码
         mask = np.zeros(self.max_pool + 1, dtype=np.int8)
-        valid = self._valid_indices()
-        for idx in valid:
-            mask[idx] = 1
+        if self.no_action_mask:
+            # 消融: 所有候选均标记为合法, 但 env 仍通过 _valid_indices 强制约束
+            mask[:n] = 1
+        else:
+            valid = self._valid_indices()
+            for idx in valid:
+                mask[idx] = 1
         mask[n] = 0 if self.no_stop else 1  # STOP 动作控制
 
         return {

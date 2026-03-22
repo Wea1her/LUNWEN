@@ -14,7 +14,9 @@ from env import TxOrderingEnv
 from networks import ActorCritic
 from train import train as train_model
 from evaluate import (evaluate_rl, evaluate_baseline, aggregate,
-                      run_robustness, plot_training_curve)
+                      run_robustness, run_pool_size_robustness,
+                      run_fee_multiplier_robustness,
+                      plot_training_curve)
 from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
@@ -71,10 +73,21 @@ def run_single_seed(seed, args_dict):
     with open(os.path.join(result_dir, "main_results.json"), "w") as f:
         json.dump(main_results, f, indent=2, ensure_ascii=False)
 
-    # 鲁棒性实验
-    print(f"[seed={seed}] 鲁棒性实验", flush=True)
+    # 鲁棒性实验: 风险比例
+    print(f"[seed={seed}] 鲁棒性实验 (风险比例)", flush=True)
     rob_data = run_robustness(model, device, args.eval_episodes,
                               args.pool_size, seed, result_dir)
+
+    # 鲁棒性实验: 候选池规模
+    print(f"[seed={seed}] 鲁棒性实验 (池大小)", flush=True)
+    rob_pool = run_pool_size_robustness(model, device, args.eval_episodes,
+                                        C.RISK_RATIO, seed, result_dir)
+
+    # 鲁棒性实验: 风险费率倍率
+    print(f"[seed={seed}] 鲁棒性实验 (费率倍率)", flush=True)
+    rob_fee_mult = run_fee_multiplier_robustness(
+        model, device, args.eval_episodes,
+        args.pool_size, seed, result_dir)
 
     # 训练曲线
     if os.path.exists(log_path):
@@ -89,7 +102,7 @@ def aggregate_across_seeds(all_main, all_rob):
     """跨种子聚合: 对每个方法的 mean 取均值和标准差"""
     methods = list(all_main[0].keys())
     metrics = ["block_fee", "fairness", "risk_exposure", "gas_util",
-               "risky_rank", "packing_ratio"]
+               "risky_rank", "packing_ratio", "top10_risk", "late_promo"]
 
     agg_main = {}
     for m in methods:
@@ -126,9 +139,10 @@ REWARD_ABLATION_CONFIGS = {
 }
 
 STRUCT_ABLATION_CONFIGS = {
-    "No-SeqSummary": {"no_seq_summary": True,  "no_stop": False},
-    "No-STOP":       {"no_seq_summary": False, "no_stop": True},
-    "Ours-Full":     {"no_seq_summary": False, "no_stop": False},
+    "No-SeqSummary":  {"no_seq_summary": True,  "no_stop": False, "no_action_mask": False},
+    "No-ActionMask":  {"no_seq_summary": False, "no_stop": False, "no_action_mask": True},
+    "No-STOP":        {"no_seq_summary": False, "no_stop": True,  "no_action_mask": False},
+    "Ours-Full":      {"no_seq_summary": False, "no_stop": False, "no_action_mask": False},
 }
 
 
