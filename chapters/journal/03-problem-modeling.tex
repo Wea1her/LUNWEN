@@ -39,13 +39,13 @@
 
 \subsection{奖励函数}
 
-奖励函数设计为手续费收益、确认公平性和风险抑制三项的加权组合。当智能体在时间步 $t$ 选择交易 $tx_{\pi(t)}$ 时，即时奖励为：
+奖励函数设计为手续费收益、等待时间均衡增益、风险抑制和动作有效性四项的加权组合。当智能体在时间步 $t$ 选择交易 $tx_{\pi(t)}$ 时，即时奖励为：
 
 \begin{equation}
-  r_t = \alpha \cdot r_t^{\text{fee}} + \beta \cdot r_t^{\text{fair}} - \gamma \cdot r_t^{\text{risk}}
+  r_t = \alpha \cdot r_t^{\text{fee}} + \beta \cdot \Delta r_t^{\text{fair}} - \gamma \cdot r_t^{\text{risk}} + \eta \cdot r_t^{\text{valid}}
 \end{equation}
 
-其中 $\alpha, \beta, \gamma$ 为预设权重系数。各分量定义如下：
+其中 $\alpha, \beta, \gamma, \eta$ 为预设权重系数。各分量定义如下。
 
 手续费收益项 $r_t^{\text{fee}}$ 为选中交易的归一化手续费：
 
@@ -53,26 +53,33 @@
   r_t^{\text{fee}} = \frac{\text{fee}(tx_{\pi(t)})}{\max_{tx \in \mathcal{T}} \text{fee}(tx)}
 \end{equation}
 
-确认公平性项 $r_t^{\text{fair}}$ 衡量交易等待时间的合理性，等待时间越长的交易被选中时给予越高的公平性奖励：
+公平性项采用增量式定义，而非静态等待时间奖励。本文以 Jain 指数作为等待时间均衡性度量，定义增量公平奖励为：
 
 \begin{equation}
-  r_t^{\text{fair}} = \frac{t_{\text{now}} - t_{\pi(t)}^{\text{arr}}}{T_{\max}}
+  \Delta r_t^{\text{fair}} = J(S_t \cup \{tx_{\pi(t)}\}) - J(S_t)
 \end{equation}
 
-其中 $T_{\max}$ 为归一化常数。该项鼓励策略适当关注长时间未被确认的交易，避免低手续费交易被无限期搁置。
+其中 $S_t$ 表示时间步 $t$ 已选交易集合，$J(\cdot)$ 为基于等待时间序列的 Jain 指数。该定义直接优化全局均衡性增益，减少“训练奖励与评估指标语义错位”的问题。
 
-风险惩罚项 $r_t^{\text{risk}}$ 基于交易的风险评分与位置敏感度的乘积：
+风险惩罚项仍保留“位置敏感”思想，但采用分段式权重以增强可解释性。设当前决策步相对位置为 $\rho_t=t/K$，其中 $K$ 为候选池规模，位置惩罚函数定义为：
 
 \begin{equation}
-  r_t^{\text{risk}} = r_{\pi(t)}^{\text{risk}} \cdot \phi(t, K)
+  \phi(\rho_t)=
+  \begin{cases}
+    1.0, & \rho_t < 0.1 \text{ 或 } \rho_t > 0.9 \\
+    0.0, & 0.4 \le \rho_t \le 0.6 \\
+    0.5, & \text{其他位置}
+  \end{cases}
 \end{equation}
 
-其中 $r_{\pi(t)}^{\text{risk}}$ 为交易的风险评分，$\phi(t, K)$ 为位置敏感度函数，在区块头部和尾部位置取较高值（这些位置对抢跑和尾随攻击更为敏感），在中间位置取较低值。具体地，$\phi(t, K)$ 定义为：
+于是风险项写为：
 
 \begin{equation}
-  \phi(t, K) = 1 - \frac{4t(K-t)}{K^2}
+  r_t^{\text{risk}} = r_{\pi(t)}^{\text{risk}} \cdot \phi(\rho_t)
 \end{equation}
 
-该函数在 $t=0$（区块首位）和 $t=K$（区块末位）处取值为 1，在 $t=K/2$（区块中间）处取最小值 0，形成 U 形分布。这一设计的动机在于：抢跑攻击通常依赖攻击交易被放置在目标交易之前（即区块靠前位置），而尾随攻击则依赖攻击交易紧随目标交易之后（即区块靠后位置）。将高风险交易排列在区块中间位置可以降低其被利用为攻击工具的可能性。
+该设计使高风险交易位于头尾敏感区时受到更强惩罚，位于中间核心区时惩罚最小，符合抢跑/尾随攻击的常见位置特征。
 
-奖励函数中三个权重系数 $\alpha$、$\beta$、$\gamma$ 控制了收益、公平性和风险抑制之间的相对重要性。在本文的实验配置中，默认取 $\alpha = 1.0$、$\beta = 0.3$、$\gamma = 0.5$。收益项权重最大，保证策略不会过度牺牲区块手续费收入；公平性项和风险项作为辅助目标，引导策略在维持收益水平的同时兼顾确认公平性和排序安全性。
+有效性项 $r_t^{\text{valid}}$ 用于约束策略滥用终止动作。当仍存在合法候选交易时若智能体提前选择 \texttt{STOP}，则施加负奖励；其余情况下该项为 0。该机制可避免策略通过“过早停止”逃避困难决策。
+
+在本文实验配置中，默认取 $\alpha = 1.0$、$\beta = 0.3$、$\gamma = 0.5$、$\eta = 0.1$。收益项保持主导地位，公平与风险项负责多目标折中，有效性项用于稳定训练行为边界。
