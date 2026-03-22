@@ -43,18 +43,16 @@ def _fmt(mean, std, precision=2):
     return f"${mean:.{precision}f} \\pm {std:.{precision}f}$"
 
 
-def _bold_best(values, higher_better=True):
-    """对最优值加粗, 次优值下划线"""
-    indexed = [(v, i) for i, v in enumerate(values)]
+def _highlight_ranked(raw_values, rendered_values, higher_better=True):
+    """按数值排序后，对最优值加粗、次优值下划线。"""
+    indexed = [(v, i) for i, v in enumerate(raw_values)]
     indexed.sort(key=lambda x: x[0], reverse=higher_better)
-    result = [None] * len(values)
-    for rank, (v, i) in enumerate(indexed):
+    result = list(rendered_values)
+    for rank, (_, i) in enumerate(indexed):
         if rank == 0:
-            result[i] = f"\\textbf{{{v}}}"
+            result[i] = f"\\textbf{{{rendered_values[i]}}}"
         elif rank == 1:
-            result[i] = f"\\underline{{{v}}}"
-        else:
-            result[i] = v
+            result[i] = f"\\underline{{{rendered_values[i]}}}"
     return result
 
 
@@ -83,7 +81,7 @@ def generate_main_table(agg: dict) -> str:
             raw_strs.append(_fmt(mean_val, std_val, prec))
             raw_means.append(mean_val)
         if higher is not None:
-            bolded = _bold_best(raw_strs, higher)
+            bolded = _highlight_ranked(raw_means, raw_strs, higher)
         else:
             # risky_rank: 接近 0.5 最好
             dists = [abs(v - 0.5) for v in raw_means]
@@ -146,6 +144,7 @@ def generate_ablation_table(agg: dict, order=None, labels=None) -> str:
 
 if __name__ == "__main__":
     import sys
+    import os
     if len(sys.argv) < 2:
         print("Usage: python latex_tables.py <results_dir>")
         sys.exit(1)
@@ -153,6 +152,15 @@ if __name__ == "__main__":
     with open(f"{d}/aggregated_main.json") as f:
         print("=== Main Table ===")
         print(generate_main_table(json.load(f)))
-    with open(f"{d}/aggregated_robustness.json") as f:
-        print("=== Robustness Table ===")
-        print(generate_robustness_table(json.load(f)))
+    robustness_files = [
+        ("Risk Robustness Table", "aggregated_robustness_risk.json"),
+        ("Pool Robustness Table", "aggregated_robustness_pool.json"),
+        ("Fee Robustness Table", "aggregated_robustness_fee.json"),
+        ("Robustness Table", "aggregated_robustness.json"),
+    ]
+    for title, filename in robustness_files:
+        path = f"{d}/{filename}"
+        if os.path.exists(path):
+            with open(path) as f:
+                print(f"=== {title} ===")
+                print(generate_robustness_table(json.load(f)))
