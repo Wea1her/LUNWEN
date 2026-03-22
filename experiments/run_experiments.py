@@ -13,7 +13,7 @@ from device_utils import resolve_device, seed_everything
 from env import TxOrderingEnv
 from networks import ActorCritic
 from train import train as train_model
-from evaluate import (evaluate_rl, evaluate_baseline, aggregate,
+from evaluate import (build_shared_pools, evaluate_rl, evaluate_baseline, aggregate,
                       run_robustness, run_pool_size_robustness,
                       run_fee_multiplier_robustness,
                       plot_training_curve)
@@ -65,13 +65,15 @@ def run_single_seed(seed, args_dict):
     print(f"[seed={seed}] 主实验评估", flush=True)
     env = TxOrderingEnv(pool_size=args.pool_size,
                         risk_ratio=C.RISK_RATIO, seed=seed)
+    shared_pools = build_shared_pools(args.eval_episodes, args.pool_size,
+                                      C.RISK_RATIO, seed)
     main_results = {}
     main_results["RL (Ours)"] = aggregate(
-        evaluate_rl(model, env, args.eval_episodes, device))
+        evaluate_rl(model, env, args.eval_episodes, device, shared_pools))
     for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
         label = bl.upper().replace("FEE_RISK_LINEAR", "FeeRiskLinear").replace("FAIR_FEE", "FairFee")
         main_results[label] = aggregate(
-            evaluate_baseline(bl, env, args.eval_episodes))
+            evaluate_baseline(bl, env, args.eval_episodes, shared_pools))
     with open(os.path.join(result_dir, "main_results.json"), "w") as f:
         json.dump(main_results, f, indent=2, ensure_ascii=False)
 
