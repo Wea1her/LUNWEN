@@ -2,12 +2,28 @@
 
 import json
 import numpy as np
-from scipy import stats
 from typing import Optional
+
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    stats = None
+    SCIPY_AVAILABLE = False
+
+
+def ensure_scipy():
+    """确保统计检验依赖可用。"""
+    if not SCIPY_AVAILABLE:
+        raise RuntimeError(
+            "scipy is required for significance testing. "
+            "Install it with `pip install -r experiments/requirements.txt`."
+        )
 
 
 def welch_ttest(vals_a: list[float], vals_b: list[float]) -> dict:
     """双样本 Welch t 检验 (不假设等方差)"""
+    ensure_scipy()
     a, b = np.array(vals_a), np.array(vals_b)
     if len(a) < 2 or len(b) < 2:
         return {"t_stat": 0.0, "p_value": 1.0}
@@ -24,6 +40,8 @@ def cohens_d(vals_a: list[float], vals_b: list[float]) -> float:
     """Cohen's d 效应量 (pooled std)"""
     a, b = np.array(vals_a), np.array(vals_b)
     na, nb = len(a), len(b)
+    if na < 2 or nb < 2:
+        return 0.0
     pooled_std = np.sqrt(((na - 1) * a.std(ddof=1)**2 +
                           (nb - 1) * b.std(ddof=1)**2) / (na + nb - 2))
     if pooled_std < 1e-12:
@@ -33,16 +51,25 @@ def cohens_d(vals_a: list[float], vals_b: list[float]) -> float:
 
 def confidence_interval(vals: list[float], confidence: float = 0.95) -> tuple:
     """均值的 t 分布置信区间"""
+    ensure_scipy()
     a = np.array(vals)
     n = len(a)
     mean = a.mean()
+    if n < 2:
+        return (float(mean), float(mean))
     se = a.std(ddof=1) / np.sqrt(n)
     t_crit = stats.t.ppf((1 + confidence) / 2, df=n - 1)
     return (float(mean - t_crit * se), float(mean + t_crit * se))
 
 
+def latex_escape(text: str) -> str:
+    """最小化转义 LaTeX 表格中的普通文本。"""
+    return text.replace("_", r"\_")
+
+
 def mann_whitney_u(vals_a: list[float], vals_b: list[float]) -> dict:
     """Mann-Whitney U 检验 (非参数)"""
+    ensure_scipy()
     u_stat, p_value = stats.mannwhitneyu(vals_a, vals_b, alternative="two-sided")
     return {"u_stat": float(u_stat), "p_value": float(p_value)}
 
@@ -119,7 +146,7 @@ def generate_significance_latex(sig_results: dict, output_path: str):
                        "^{**}" if r["p_value"] < 0.01 else \
                        "^{*}" if r["p_value"] < 0.05 else ""
             lines.append(
-                f"{bl} & {met} & "
+                f"{latex_escape(bl)} & {latex_escape(met)} & "
                 f"${r['ours_mean']:.4f}$ & ${r['baseline_mean']:.4f}$ & "
                 f"${r['cohens_d']:.2f}$ & "
                 f"${r['p_value']:.4f}{sig_mark}$ \\\\")
