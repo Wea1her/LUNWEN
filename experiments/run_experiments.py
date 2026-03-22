@@ -259,8 +259,8 @@ def main():
                         help="跳过训练, 仅评估已有模型")
     parser.add_argument("--ablation", action="store_true",
                         help="运行消融实验 (奖励 + 结构)")
-    parser.add_argument("--workers", type=int, default=3,
-                        help="并行进程数 (默认 3)")
+    parser.add_argument("--workers", type=int, default=5,
+                        help="并行进程数 (默认 5)")
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)
