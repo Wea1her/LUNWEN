@@ -2,3 +2,5 @@
 
 experiments/.venv/
 
+# Ignore the __pycache__ directory created by Python in the experiments folder
+experiments/__pycache__/
