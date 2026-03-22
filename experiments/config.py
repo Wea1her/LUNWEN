@@ -34,7 +34,7 @@ GAE_LAMBDA = 0.95        # GAE λ
 PPO_CLIP = 0.2           # 截断参数 ε
 PPO_EPOCHS = 4           # 每回合更新轮数
 ENTROPY_COEF = 0.01      # 熵正则系数
-TOTAL_EPISODES = 10_000  # 训练回合数
+TOTAL_EPISODES = 3000  # 训练回合数
 BATCH_SIZE = 64          # mini-batch 大小
 LOG_INTERVAL = 100       # 日志打印间隔
 
