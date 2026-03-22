@@ -21,6 +21,8 @@ from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS)
+from stat_tests import (run_significance_tests, format_significance_table,
+                        generate_significance_latex)
 
 
 def run_single_seed(seed, args_dict):
@@ -295,6 +297,17 @@ def main():
     with open(t3_path, "w") as f:
         f.write(t3)
     print(f"LaTeX 表格已保存: {t2_path}, {t3_path}")
+
+    # 统计显著性检验
+    print("\n===== 统计显著性检验 =====")
+    sig = run_significance_tests(all_main)
+    print(format_significance_table(sig))
+    sig_path = os.path.join(args.output, "significance_tests.json")
+    with open(sig_path, "w") as f:
+        json.dump(sig, f, indent=2, ensure_ascii=False)
+    sig_tex = os.path.join(args.output, "table_significance.tex")
+    generate_significance_latex(sig, sig_tex)
+    print(f"显著性检验已保存: {sig_path}, {sig_tex}")
 
     # 消融实验 (并行)
     if args.ablation:

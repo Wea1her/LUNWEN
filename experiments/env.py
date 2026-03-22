@@ -100,17 +100,20 @@ class TxOrderingEnv(gym.Env):
         valid = self._valid_indices()
         stop_idx = len(self._candidates)
 
-        # STOP 动作或无效动作
-        if action == stop_idx or action not in valid:
+        # STOP 动作
+        if action == stop_idx:
             stop_penalty = 0.0
-            if action == stop_idx and len(valid) > 0:
-                # 惩罚与剩余可打包价值挂钩: 剩余合法交易的平均收益 × 剩余数量的对数
+            if len(valid) > 0:
                 remaining_fees = [self._candidates[i].fee for i in valid]
                 avg_remaining = sum(remaining_fees) / (len(remaining_fees) * max(self._max_fee, 1e-8))
                 import math
                 stop_penalty = -self.eta * (1.0 + avg_remaining * math.log1p(len(valid)))
             self._done = True
             return self._obs(), stop_penalty, True, False, self._info()
+
+        # 无效动作: 不终止, 施加小惩罚, 状态不变
+        if action not in valid:
+            return self._obs(), -self.eta, False, False, self._info()
 
         tx = self._candidates[action]
 
@@ -177,10 +180,13 @@ class TxOrderingEnv(gym.Env):
         new_waits = np.append(old_waits, new_wait)
         delta_fair = self._jain_index(new_waits) - self._jain_index(old_waits)
 
-        # 分段式风险惩罚
-        K = max(len(self._pool), 1)
-        t = self._step_count
-        pos_ratio = t / K
+        # 分段式风险惩罚 (基于实际打包进度, 非池大小)
+        avg_gas = sum(tx.gas for tx in self._pool) / max(len(self._pool), 1)
+        estimated_block_size = max(int(C.MAX_BLOCK_GAS / avg_gas), 1) if avg_gas > 0 else len(self._pool)
+        if estimated_block_size <= 1:
+            pos_ratio = 0.5
+        else:
+            pos_ratio = self._step_count / estimated_block_size
         if pos_ratio < 0.1 or pos_ratio > 0.9:
             phi = 1.0      # 头尾 10%: 强惩罚
         elif 0.4 <= pos_ratio <= 0.6:

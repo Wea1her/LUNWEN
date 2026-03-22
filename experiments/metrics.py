@@ -38,9 +38,10 @@ def risk_exposure(selected: List[Transaction],
     if K == 0:
         return 0.0
     n_edge = max(int(K * ratio), 1)
-    head = selected[:n_edge]
-    tail = selected[-n_edge:]
-    sensitive = head + tail
+    head_idx = set(range(n_edge))
+    tail_idx = set(range(max(K - n_edge, 0), K))
+    sensitive_idx = head_idx | tail_idx  # 去重
+    sensitive = [selected[i] for i in sensitive_idx]
 
     risky_in_sensitive = sum(1 for tx in sensitive
                             if tx.risk_score >= threshold)
