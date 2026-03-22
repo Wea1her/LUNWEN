@@ -21,8 +21,8 @@ from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS)
-from stat_tests import (run_significance_tests, format_significance_table,
-                        generate_significance_latex)
+from stat_tests import (SCIPY_AVAILABLE, run_significance_tests,
+                        format_significance_table, generate_significance_latex)
 
 
 def run_single_seed(seed, args_dict):
@@ -97,10 +97,29 @@ def run_single_seed(seed, args_dict):
                             os.path.join(result_dir, "training_curve.png"))
 
     print(f"[seed={seed}] 全部完成", flush=True)
-    return seed, main_results, rob_data
+    return seed, main_results, rob_data, rob_pool, rob_fee_mult
 
 
-def aggregate_across_seeds(all_main, all_rob):
+def aggregate_metric_grid(all_results):
+    """聚合形如 {setting: {method: metric_stats}} 的结果网格。"""
+    settings = list(all_results[0].keys())
+    methods = list(all_results[0][settings[0]].keys())
+    metrics = ["block_fee", "fairness", "risk_exposure", "gas_util",
+               "risky_rank", "packing_ratio", "top10_risk", "late_promo"]
+
+    agg = {}
+    for setting in settings:
+        agg[setting] = {}
+        for method in methods:
+            agg[setting][method] = {}
+            for metric in metrics:
+                vals = [r[setting][method][f"{metric}_mean"] for r in all_results]
+                agg[setting][method][f"{metric}_mean"] = float(np.mean(vals))
+                agg[setting][method][f"{metric}_std"] = float(np.std(vals))
+    return agg
+
+
+def aggregate_across_seeds(all_main, all_rob_risk, all_rob_pool, all_rob_fee):
     """跨种子聚合: 对每个方法的 mean 取均值和标准差"""
     methods = list(all_main[0].keys())
     metrics = ["block_fee", "fairness", "risk_exposure", "gas_util",
@@ -114,19 +133,11 @@ def aggregate_across_seeds(all_main, all_rob):
             agg_main[m][f"{met}_mean"] = float(np.mean(vals))
             agg_main[m][f"{met}_std"] = float(np.std(vals))
 
-    risk_ratios = list(all_rob[0].keys())
-    rob_methods = list(all_rob[0][risk_ratios[0]].keys())
-    agg_rob = {}
-    for rr in risk_ratios:
-        agg_rob[rr] = {}
-        for m in rob_methods:
-            agg_rob[rr][m] = {}
-            for met in metrics:
-                vals = [r[rr][m][f"{met}_mean"] for r in all_rob]
-                agg_rob[rr][m][f"{met}_mean"] = float(np.mean(vals))
-                agg_rob[rr][m][f"{met}_std"] = float(np.std(vals))
+    agg_rob_risk = aggregate_metric_grid(all_rob_risk)
+    agg_rob_pool = aggregate_metric_grid(all_rob_pool)
+    agg_rob_fee = aggregate_metric_grid(all_rob_fee)
 
-    return agg_main, agg_rob
+    return agg_main, agg_rob_risk, agg_rob_pool, agg_rob_fee
 
 
 # ================================================================
@@ -260,7 +271,9 @@ def main():
     # 并行训练+评估所有 seed
     args_dict = vars(args)
     all_main = [None] * len(args.seeds)
-    all_rob = [None] * len(args.seeds)
+    all_rob_risk = [None] * len(args.seeds)
+    all_rob_pool = [None] * len(args.seeds)
+    all_rob_fee = [None] * len(args.seeds)
 
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         futures = {}
@@ -270,44 +283,71 @@ def main():
 
         for fut in as_completed(futures):
             idx = futures[fut]
-            seed, main_res, rob_res = fut.result()
+            seed, main_res, rob_risk_res, rob_pool_res, rob_fee_res = fut.result()
             all_main[idx] = main_res
-            all_rob[idx] = rob_res
+            all_rob_risk[idx] = rob_risk_res
+            all_rob_pool[idx] = rob_pool_res
+            all_rob_fee[idx] = rob_fee_res
             print(f"[seed={seed}] 结果已收集 ({idx+1}/{len(args.seeds)})",
                   flush=True)
 
     # 跨种子聚合
-    agg_main, agg_rob = aggregate_across_seeds(all_main, all_rob)
+    agg_main, agg_rob_risk, agg_rob_pool, agg_rob_fee = aggregate_across_seeds(
+        all_main, all_rob_risk, all_rob_pool, all_rob_fee)
 
     agg_main_path = os.path.join(args.output, "aggregated_main.json")
-    agg_rob_path = os.path.join(args.output, "aggregated_robustness.json")
+    agg_rob_risk_path = os.path.join(args.output, "aggregated_robustness_risk.json")
+    agg_rob_pool_path = os.path.join(args.output, "aggregated_robustness_pool.json")
+    agg_rob_fee_path = os.path.join(args.output, "aggregated_robustness_fee.json")
     with open(agg_main_path, "w") as f:
         json.dump(agg_main, f, indent=2, ensure_ascii=False)
-    with open(agg_rob_path, "w") as f:
-        json.dump(agg_rob, f, indent=2, ensure_ascii=False)
-    print(f"\n聚合结果已保存: {agg_main_path}, {agg_rob_path}")
+    with open(agg_rob_risk_path, "w") as f:
+        json.dump(agg_rob_risk, f, indent=2, ensure_ascii=False)
+    with open(agg_rob_pool_path, "w") as f:
+        json.dump(agg_rob_pool, f, indent=2, ensure_ascii=False)
+    with open(agg_rob_fee_path, "w") as f:
+        json.dump(agg_rob_fee, f, indent=2, ensure_ascii=False)
+    print(
+        "\n聚合结果已保存: "
+        f"{agg_main_path}, {agg_rob_risk_path}, {agg_rob_pool_path}, {agg_rob_fee_path}"
+    )
 
     # 生成 LaTeX 表格
     t2 = generate_main_table(agg_main)
-    t3 = generate_robustness_table(agg_rob)
+    t3_risk = generate_robustness_table(agg_rob_risk)
+    t3_pool = generate_robustness_table(agg_rob_pool)
+    t3_fee = generate_robustness_table(agg_rob_fee)
     t2_path = os.path.join(args.output, "table2_content.tex")
-    t3_path = os.path.join(args.output, "table3_content.tex")
+    t3_risk_path = os.path.join(args.output, "table3_risk_content.tex")
+    t3_pool_path = os.path.join(args.output, "table3_pool_content.tex")
+    t3_fee_path = os.path.join(args.output, "table3_fee_content.tex")
     with open(t2_path, "w") as f:
         f.write(t2)
-    with open(t3_path, "w") as f:
-        f.write(t3)
-    print(f"LaTeX 表格已保存: {t2_path}, {t3_path}")
+    with open(t3_risk_path, "w") as f:
+        f.write(t3_risk)
+    with open(t3_pool_path, "w") as f:
+        f.write(t3_pool)
+    with open(t3_fee_path, "w") as f:
+        f.write(t3_fee)
+    print(
+        "LaTeX 表格已保存: "
+        f"{t2_path}, {t3_risk_path}, {t3_pool_path}, {t3_fee_path}"
+    )
 
     # 统计显著性检验
-    print("\n===== 统计显著性检验 =====")
-    sig = run_significance_tests(all_main)
-    print(format_significance_table(sig))
-    sig_path = os.path.join(args.output, "significance_tests.json")
-    with open(sig_path, "w") as f:
-        json.dump(sig, f, indent=2, ensure_ascii=False)
-    sig_tex = os.path.join(args.output, "table_significance.tex")
-    generate_significance_latex(sig, sig_tex)
-    print(f"显著性检验已保存: {sig_path}, {sig_tex}")
+    if SCIPY_AVAILABLE:
+        print("\n===== 统计显著性检验 =====")
+        sig = run_significance_tests(all_main)
+        print(format_significance_table(sig))
+        sig_path = os.path.join(args.output, "significance_tests.json")
+        with open(sig_path, "w") as f:
+            json.dump(sig, f, indent=2, ensure_ascii=False)
+        sig_tex = os.path.join(args.output, "table_significance.tex")
+        generate_significance_latex(sig, sig_tex)
+        print(f"显著性检验已保存: {sig_path}, {sig_tex}")
+    else:
+        print("\n===== 统计显著性检验 =====")
+        print("Warning: scipy 未安装, 跳过显著性检验与对应 LaTeX 表格生成。")
 
     # 消融实验 (并行)
     if args.ablation:
