@@ -74,13 +74,20 @@ def train(args):
         if ep_reward > best_reward:
             best_reward = ep_reward
             torch.save(model.state_dict(),
-                       os.path.join(args.output, "best_model.pt"))
+                       os.path.join(args.output, C.BEST_CHECKPOINT_NAME))
 
     # 保存最终模型和训练日志
     torch.save(model.state_dict(),
-               os.path.join(args.output, "final_model.pt"))
+               os.path.join(args.output, C.FINAL_CHECKPOINT_NAME))
     with open(os.path.join(args.output, "train_log.json"), "w") as f:
         json.dump(log, f)
+    with open(os.path.join(args.output, "checkpoint_meta.json"), "w") as f:
+        json.dump({
+            "formal_eval_checkpoint": C.FORMAL_EVAL_CHECKPOINT_NAME,
+            "formal_eval_rule": C.FORMAL_EVAL_CHECKPOINT_RULE,
+            "best_checkpoint": C.BEST_CHECKPOINT_NAME,
+            "final_checkpoint": C.FINAL_CHECKPOINT_NAME,
+        }, f, indent=2, ensure_ascii=False)
     print(f"Training complete. Models saved to {args.output}/")
 
 

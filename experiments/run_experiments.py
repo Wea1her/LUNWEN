@@ -13,7 +13,8 @@ from device_utils import resolve_device, seed_everything
 from env import TxOrderingEnv
 from networks import ActorCritic
 from train import train as train_model
-from evaluate import (build_shared_pools, evaluate_rl, evaluate_baseline, aggregate,
+from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
+                      evaluate_rl, evaluate_baseline, aggregate,
                       run_robustness, run_pool_size_robustness,
                       run_fee_multiplier_robustness,
                       plot_training_curve)
@@ -36,7 +37,7 @@ def run_single_seed(seed, args_dict):
     os.makedirs(ckpt_dir, exist_ok=True)
     os.makedirs(result_dir, exist_ok=True)
 
-    model_path = os.path.join(ckpt_dir, "best_model.pt")
+    model_path = os.path.join(ckpt_dir, C.FORMAL_EVAL_CHECKPOINT_NAME)
     log_path = os.path.join(ckpt_dir, "train_log.json")
 
     # 训练
@@ -161,7 +162,7 @@ STRUCT_ABLATION_CONFIGS = {
 }
 
 
-def _train_ablation_single(name, seed, args_dict, env_kwargs):
+def _train_ablation_single(name, seed, args_dict, env_kwargs, shared_pool_path=None):
     """单个消融变体+种子的训练与评估 (独立进程)"""
     from ppo import PPOTrainer, RolloutBuffer
     args = argparse.Namespace(**args_dict)
@@ -170,7 +171,9 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs):
     abl_dir = os.path.join(args.output, "ablation", name, f"seed_{seed}")
     ckpt_dir = os.path.join(abl_dir, "checkpoints")
     os.makedirs(ckpt_dir, exist_ok=True)
-    model_path = os.path.join(ckpt_dir, "best_model.pt")
+    best_model_path = os.path.join(ckpt_dir, C.BEST_CHECKPOINT_NAME)
+    final_model_path = os.path.join(ckpt_dir, C.FINAL_CHECKPOINT_NAME)
+    model_path = os.path.join(ckpt_dir, C.FORMAL_EVAL_CHECKPOINT_NAME)
 
     if not args.skip_train:
         print(f"  [Ablation] {name} seed={seed} 开始训练", flush=True)
@@ -198,7 +201,15 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs):
             buffer.clear()
             if ep_reward > best_reward:
                 best_reward = ep_reward
-                torch.save(model.state_dict(), model_path)
+                torch.save(model.state_dict(), best_model_path)
+        torch.save(model.state_dict(), final_model_path)
+        with open(os.path.join(ckpt_dir, "checkpoint_meta.json"), "w") as f:
+            json.dump({
+                "formal_eval_checkpoint": C.FORMAL_EVAL_CHECKPOINT_NAME,
+                "formal_eval_rule": C.FORMAL_EVAL_CHECKPOINT_RULE,
+                "best_checkpoint": C.BEST_CHECKPOINT_NAME,
+                "final_checkpoint": C.FINAL_CHECKPOINT_NAME,
+            }, f, indent=2, ensure_ascii=False)
         print(f"  [Ablation] {name} seed={seed} 训练完成", flush=True)
 
     model = ActorCritic().to(device)
@@ -210,7 +221,21 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs):
     env = TxOrderingEnv(pool_size=args.pool_size,
                         risk_ratio=C.RISK_RATIO, seed=seed,
                         **env_kwargs)
-    result = aggregate(evaluate_rl(model, env, args.eval_episodes, device))
+    if shared_pool_path and os.path.exists(shared_pool_path):
+        shared_pools = load_shared_pools(shared_pool_path)
+    else:
+        shared_pools = build_shared_pools(args.eval_episodes, args.pool_size,
+                                          C.RISK_RATIO, seed)
+    result = aggregate(
+        evaluate_rl(model, env, args.eval_episodes, device, shared_pools))
+    result_path = os.path.join(abl_dir, "eval_result.json")
+    with open(result_path, "w") as f:
+        json.dump({
+            "variant": name,
+            "seed": seed,
+            "shared_pool_path": shared_pool_path,
+            "metrics": result,
+        }, f, indent=2, ensure_ascii=False)
     return name, seed, result
 
 
@@ -218,7 +243,21 @@ def run_ablation_parallel(configs, args, label_prefix):
     """并行运行消融实验"""
     metrics = ["block_fee", "fairness", "risk_exposure", "gas_util"]
     args_dict = vars(args)
-    tasks = []
+    shared_pool_dir = os.path.join(args.output, "ablation", "shared_pools")
+    os.makedirs(shared_pool_dir, exist_ok=True)
+    shared_pool_paths = {}
+    for seed in args.seeds:
+        shared_pool_path = os.path.join(shared_pool_dir, f"seed_{seed}.json")
+        shared_pools = build_shared_pools(args.eval_episodes, args.pool_size,
+                                          C.RISK_RATIO, seed)
+        save_shared_pools(shared_pool_path, shared_pools, metadata={
+            "seed": seed,
+            "eval_episodes": args.eval_episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": C.RISK_RATIO,
+            "source": "ablation_evaluation_shared_pools",
+        })
+        shared_pool_paths[seed] = shared_pool_path
 
     max_workers = min(args.workers, len(configs) * len(args.seeds))
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -227,7 +266,8 @@ def run_ablation_parallel(configs, args, label_prefix):
             for seed in args.seeds:
                 fut = executor.submit(_train_ablation_single,
                                       f"{label_prefix}_{name}",
-                                      seed, args_dict, env_kwargs)
+                                      seed, args_dict, env_kwargs,
+                                      shared_pool_paths[seed])
                 futures[fut] = (name, seed)
 
         results = {name: [] for name in configs}

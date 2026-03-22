@@ -241,7 +241,7 @@ r_t = \alpha r_{fee}(t) + \beta \Delta r_{fair}(t) - \gamma r_{risk}(t) + \eta r
 - 5 个随机种子；
 - 每个种子报告独立均值；
 - 主表给出跨种子均值 ± 标准差；
-- 对关键指标补充显著性检验（如 Welch t-test 或 Mann-Whitney U）；
+- 对关键指标补充显著性检验（如 Welch t-test），并结合效应量与置信区间；
 - 报告效应量；
 - 图中加标准差误差带。
 

@@ -2,6 +2,7 @@
 
 import argparse
 from copy import deepcopy
+import dataclasses
 import os
 import json
 import numpy as np
@@ -13,7 +14,7 @@ from networks import ActorCritic
 from baselines import run_baseline
 from metrics import compute_all_metrics
 from device_utils import resolve_device
-from transaction import generate_pool
+from transaction import Transaction, generate_pool
 
 
 def build_shared_pools(n_episodes: int, pool_size: int,
@@ -21,6 +22,34 @@ def build_shared_pools(n_episodes: int, pool_size: int,
     """为不同方法预生成完全一致的评估交易池。"""
     rng = np.random.default_rng(seed)
     return [generate_pool(rng, pool_size, risk_ratio) for _ in range(n_episodes)]
+
+
+def save_shared_pools(path: str, shared_pools: list[list[Transaction]],
+                      metadata: dict | None = None):
+    """将共享评估池落盘, 便于不同实验变体复用和复核。"""
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    payload = {
+        "metadata": metadata or {},
+        "pools": [
+            [dataclasses.asdict(tx) for tx in pool]
+            for pool in shared_pools
+        ],
+    }
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+
+
+def load_shared_pools(path: str) -> list[list[Transaction]]:
+    """从磁盘恢复共享评估池。"""
+    with open(path) as f:
+        payload = json.load(f)
+    raw_pools = payload["pools"] if isinstance(payload, dict) else payload
+    return [
+        [Transaction(**tx_data) for tx_data in pool]
+        for pool in raw_pools
+    ]
 
 
 def evaluate_rl(model: ActorCritic, env: TxOrderingEnv,
@@ -262,7 +291,15 @@ def plot_training_curve(log_path: str, save_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="评估与对比")
-    parser.add_argument("--model", type=str, default="checkpoints/best_model.pt")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=os.path.join("checkpoints", C.FORMAL_EVAL_CHECKPOINT_NAME),
+        help=(
+            "待评估模型路径。默认使用正式实验规则指定的 checkpoint "
+            f"({C.FORMAL_EVAL_CHECKPOINT_NAME}; {C.FORMAL_EVAL_CHECKPOINT_RULE})."
+        ),
+    )
     parser.add_argument("--episodes", type=int, default=C.EVAL_EPISODES)
     parser.add_argument("--pool-size", type=C.validate_pool_size,
                         default=C.POOL_SIZE_DEFAULT)

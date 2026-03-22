@@ -44,7 +44,7 @@
 
 \subsubsection{训练与统计配置}
 
-PPO 训练超参数与统计设置如表~\ref{tab:train_stats} 所示。所有正式实验均采用 5 个独立随机种子，每个种子独立训练并独立评估，主表结果报告跨种子均值与标准差。
+PPO 训练超参数与统计设置如表~\ref{tab:train_stats} 所示。所有正式实验均采用 5 个独立随机种子，每个种子独立训练并独立评估，主表结果报告跨种子均值与标准差。主实验、三类鲁棒性实验、奖励消融与结构消融均在各自种子预生成的共享评估池上完成，同一 seed 下所有方法与消融变体复用完全一致的一批 episode 交易池。正式评估统一加载训练阶段按单回合累计奖励保存的 \texttt{best\_model.pt}。
 
 \begin{table}[htbp]
 \centering
@@ -173,7 +173,7 @@ Fair-Fee Greedy  & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \
 
 \subsubsection{奖励消融}
 
-奖励消融包含四个变体：FeeOnly、Fee+Fair、Fee+Risk、Full Reward。结果如表~\ref{tab:ablation_reward} 所示。
+奖励消融包含四个变体：FeeOnly、Fee+Fair、Fee+Risk、Full Reward。所有奖励变体在同一 seed 下复用相同共享评估池，结果如表~\ref{tab:ablation_reward} 所示。
 
 \begin{table}[htbp]
 \centering
@@ -195,7 +195,7 @@ Full Reward   & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
 
 \subsubsection{结构消融}
 
-结构消融包含 No-SeqSummary、No-ActionMask、No-STOP 与 Full Model 四个变体。结果如表~\ref{tab:ablation_struct} 所示。
+结构消融包含 No-SeqSummary、No-ActionMask、No-STOP 与 Full Model 四个变体。所有结构变体在同一 seed 下复用相同共享评估池，结果如表~\ref{tab:ablation_struct} 所示。
 
 \begin{table}[htbp]
 \centering
@@ -255,7 +255,15 @@ Nonce 约束明显 & \TODO{} & \TODO{} & \TODO{} \\
 
 \subsection{统计报告规范}
 
-本文实验统一采用以下统计口径：5 个独立随机种子；每个种子独立训练与评估；主表报告跨种子均值 $\pm$ 标准差；关键指标补充显著性检验（Welch $t$ 检验或 Mann-Whitney $U$ 检验）与效应量；趋势图报告标准差误差带。若版面受限，显著性详细结果放入附录或补充材料。
+本文实验统一采用以下统计口径：5 个独立随机种子；每个种子独立训练与评估；主表报告跨种子均值 $\pm$ 标准差；关键指标默认采用 Welch $t$ 检验，并补充 Cohen's $d$ 效应量与 95\% 置信区间；趋势图报告标准差误差带。显著性检验仅在统计依赖可用且参与聚合的 seed 数量不少于 2 时执行。若版面受限，显著性详细结果放入附录或补充材料。
+
+\subsection{局限性与有效性威胁}
+
+本文结果应理解为可控仿真环境中的方法可行性证据，而非对真实链上部署效果的直接预测。实验中的手续费、风险评分、历史成功率和历史确认延迟均由参数化分布生成，用于构造中高负载候选池及位置敏感风险场景。这种设定有助于在统一协议下比较不同排序方法，但不等同于真实内存池中由协议规则、市场博弈和链上事件共同形成的数据分布。
+
+当前环境聚焦通用候选池排序验证，显式建模的约束主要包括 Gas 容量、Nonce 依赖、位置敏感风险和提前终止行为，尚未直接模拟 DEX/AMM 价格状态、滑点反馈、池内流动性变化和真实执行回滚机制。因此，本文结论更适用于抽象区块构建场景下的相对方法比较，而不能直接外推为具体 DeFi 应用中的最终收益或防护效果。
+
+统计显著性分析当前基于随机种子层面的重复训练与评估结果，反映的是同一仿真协议下方法稳定性，而非跨真实时间区间、跨市场状态或跨数据源的统计外推能力。后续工作需要结合真实链上数据回放与更复杂执行环境，对本文方法的泛化能力和实际部署价值做进一步验证。
 
 \subsection{本章小结}
 

@@ -45,6 +45,10 @@ HEURISTIC_RISK_THRESHOLD = 0.5  # 启发式风险阈值
 # ========== 评估 ==========
 EVAL_EPISODES = 1000
 RISK_POSITION_RATIO = 0.1  # 风险暴露度: 头/尾 10%
+BEST_CHECKPOINT_NAME = "best_model.pt"
+FINAL_CHECKPOINT_NAME = "final_model.pt"
+FORMAL_EVAL_CHECKPOINT_NAME = BEST_CHECKPOINT_NAME
+FORMAL_EVAL_CHECKPOINT_RULE = "best_episode_reward"
 
 # ========== 新增基线参数 ==========
 LINEAR_LAMBDA_F = 1.0   # Fee-Risk 线性评分: 手续费权重
