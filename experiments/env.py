@@ -24,12 +24,22 @@ class TxOrderingEnv(gym.Env):
                  pool_size: int | None = None,
                  risk_ratio: float = C.RISK_RATIO,
                  max_pool: int = C.POOL_SIZE_MAX,
-                 seed: int | None = None):
+                 seed: int | None = None,
+                 alpha: float = C.ALPHA,
+                 beta: float = C.BETA,
+                 gamma_r: float = C.GAMMA_R,
+                 no_seq_summary: bool = False,
+                 no_stop: bool = False):
         super().__init__()
         self.pool_size = pool_size
         self.risk_ratio = risk_ratio
         self.max_pool = max_pool
         self.rng = np.random.default_rng(seed)
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma_r = gamma_r
+        self.no_seq_summary = no_seq_summary
+        self.no_stop = no_stop
 
         # 观测 / 动作空间 (用 dict 传递变长数据)
         self.observation_space = spaces.Dict({
@@ -144,7 +154,7 @@ class TxOrderingEnv(gym.Env):
         phi = 1.0 - 4.0 * t * (K - t) / (K * K) if K > 0 else 1.0
         r_risk = tx.risk_score * max(phi, 0.0)
 
-        return C.ALPHA * r_fee + C.BETA * r_fair - C.GAMMA_R * r_risk
+        return self.alpha * r_fee + self.beta * r_fair - self.gamma_r * r_risk
 
     def _obs(self) -> dict:
         """构造 padded 观测"""
@@ -159,7 +169,7 @@ class TxOrderingEnv(gym.Env):
         acc_fee_norm = self._acc_fee / (self._max_fee * max(len(self._pool), 1))
 
         # 已选交易序列摘要 (均值池化)
-        if self._selected:
+        if self._selected and not self.no_seq_summary:
             sel_feats = np.stack([
                 tx.feature_vector(self._max_fee, self._max_gas, self._t_max)
                 for tx in self._selected
@@ -180,7 +190,7 @@ class TxOrderingEnv(gym.Env):
         valid = self._valid_indices()
         for idx in valid:
             mask[idx] = 1
-        mask[n] = 1  # STOP 始终可选 (映射到候选列表长度位置)
+        mask[n] = 0 if self.no_stop else 1  # STOP 动作控制
 
         return {
             "tx_features": features,

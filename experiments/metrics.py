@@ -56,13 +56,36 @@ def gas_utilization(selected: List[Transaction]) -> float:
     return used / C.MAX_BLOCK_GAS
 
 
+def avg_risky_rank(selected: List[Transaction],
+                   threshold: float = C.HEURISTIC_RISK_THRESHOLD) -> float:
+    """高风险交易在区块中的平均相对位置 (0=头, 0.5=中, 1=尾)"""
+    K = len(selected)
+    if K <= 1:
+        return 0.5
+    positions = [i / (K - 1) for i, tx in enumerate(selected)
+                 if tx.risk_score >= threshold]
+    if not positions:
+        return 0.5
+    return float(np.mean(positions))
+
+
+def packing_ratio(selected: List[Transaction],
+                  pool: List[Transaction]) -> float:
+    """打包比例: 实际选入数 / 候选池大小"""
+    if not pool:
+        return 0.0
+    return len(selected) / len(pool)
+
+
 def compute_all_metrics(selected: List[Transaction],
                         pool: List[Transaction]) -> dict:
-    """计算全部四项指标"""
+    """计算全部六项指标"""
     t_now = max(tx.arrival_time for tx in pool) + 1.0 if pool else 1.0
     return {
         "block_fee": block_fee_revenue(selected),
         "fairness": jain_fairness_index(selected, t_now),
         "risk_exposure": risk_exposure(selected),
         "gas_util": gas_utilization(selected),
+        "risky_rank": avg_risky_rank(selected),
+        "packing_ratio": packing_ratio(selected, pool),
     }

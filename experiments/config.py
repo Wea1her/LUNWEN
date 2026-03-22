@@ -3,7 +3,8 @@
 # ========== 仿真环境 ==========
 MAX_BLOCK_GAS = 30_000_000
 POOL_SIZE_MIN = 50
-POOL_SIZE_MAX = 200
+POOL_SIZE_MAX = 500
+POOL_SIZE_DEFAULT = 300
 GAS_TRANSFER = 21_000
 GAS_CONTRACT_MIN = 50_000
 GAS_CONTRACT_MAX = 500_000
@@ -40,5 +41,15 @@ LOG_INTERVAL = 100       # 日志打印间隔
 HEURISTIC_RISK_THRESHOLD = 0.5  # 启发式风险阈值
 
 # ========== 评估 ==========
-EVAL_EPISODES = 500
+EVAL_EPISODES = 1000
 RISK_POSITION_RATIO = 0.1  # 风险暴露度: 头/尾 10%
+
+# ========== 新增基线参数 ==========
+LINEAR_LAMBDA_F = 1.0   # Fee-Risk 线性评分: 手续费权重
+LINEAR_LAMBDA_R = 0.5   # Fee-Risk 线性评分: 风险惩罚权重
+FAIR_LAMBDA_F = 1.0      # Fair-Fee 双目标: 手续费权重
+FAIR_LAMBDA_W = 0.5      # Fair-Fee 双目标: 等待时间权重
+
+# ========== 多种子与鲁棒性 ==========
+SEEDS = [42, 123, 456, 789, 2025]
+ROBUSTNESS_RISK_RATIOS = [0.05, 0.10, 0.15, 0.20, 0.30]

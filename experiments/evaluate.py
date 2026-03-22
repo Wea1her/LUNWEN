@@ -57,30 +57,32 @@ def aggregate(results: list[dict]) -> dict:
 
 
 def print_table(all_results: dict[str, dict]):
-    """打印 LaTeX 格式的结果表"""
-    header = ("方法", "区块收益", "公平性指数", "风险暴露度", "Gas利用率")
-    print(f"{'方法':<15s} {'区块收益':>12s} {'公平性指数':>12s} "
-          f"{'风险暴露度':>12s} {'Gas利用率':>12s}")
-    print("-" * 70)
+    """打印结果表"""
+    print(f"{'方法':<20s} {'区块收益':>10s} {'公平性':>10s} "
+          f"{'风险暴露':>10s} {'Gas利用':>10s} "
+          f"{'风险排名':>10s} {'打包比':>10s}")
+    print("-" * 90)
     for name, agg in all_results.items():
-        print(f"{name:<15s} "
-              f"{agg['block_fee_mean']:>10.1f}±{agg['block_fee_std']:<5.1f} "
-              f"{agg['fairness_mean']:>8.4f}±{agg['fairness_std']:<6.4f} "
-              f"{agg['risk_exposure_mean']:>8.4f}±{agg['risk_exposure_std']:<6.4f} "
-              f"{agg['gas_util_mean']:>8.4f}±{agg['gas_util_std']:<6.4f}")
+        print(f"{name:<20s} "
+              f"{agg['block_fee_mean']:>8.1f}±{agg['block_fee_std']:<4.1f} "
+              f"{agg['fairness_mean']:>8.4f} "
+              f"{agg['risk_exposure_mean']:>8.4f} "
+              f"{agg['gas_util_mean']:>8.4f} "
+              f"{agg.get('risky_rank_mean', 0.5):>8.4f} "
+              f"{agg.get('packing_ratio_mean', 0.0):>8.4f}")
 
 
 def run_robustness(model, device, n_episodes, pool_size, seed,
                    output_dir="results"):
     """不同风险比例下的鲁棒性实验, 返回并保存 JSON"""
-    risk_ratios = [0.05, 0.15, 0.30]
+    risk_ratios = C.ROBUSTNESS_RISK_RATIOS
     all_data = {}
     print("\n===== 鲁棒性分析 =====")
     for rr in risk_ratios:
         env = TxOrderingEnv(pool_size=pool_size, risk_ratio=rr, seed=seed)
         results = {}
         results["RL"] = aggregate(evaluate_rl(model, env, n_episodes, device))
-        for bl in ["fifo", "gas", "heuristic"]:
+        for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
             results[bl] = aggregate(evaluate_baseline(bl, env, n_episodes))
         print(f"\n--- risk_ratio = {rr:.0%} ---")
         print_table(results)
@@ -161,7 +163,7 @@ def main():
     parser = argparse.ArgumentParser(description="评估与对比")
     parser.add_argument("--model", type=str, default="checkpoints/best_model.pt")
     parser.add_argument("--episodes", type=int, default=C.EVAL_EPISODES)
-    parser.add_argument("--pool-size", type=int, default=100)
+    parser.add_argument("--pool-size", type=int, default=C.POOL_SIZE_DEFAULT)
     parser.add_argument("--risk-ratio", type=float, default=C.RISK_RATIO)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=str, default="results")
@@ -200,8 +202,9 @@ def main():
     all_results = {}
     all_results["RL (Ours)"] = aggregate(
         evaluate_rl(model, env, args.episodes, device))
-    for bl in ["fifo", "gas", "heuristic"]:
-        all_results[bl.upper()] = aggregate(
+    for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
+        label = bl.upper().replace("FEE_RISK_LINEAR", "FeeRiskLinear").replace("FAIR_FEE", "FairFee")
+        all_results[label] = aggregate(
             evaluate_baseline(bl, env, args.episodes))
     print_table(all_results)
 

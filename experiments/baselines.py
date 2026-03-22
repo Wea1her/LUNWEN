@@ -72,6 +72,38 @@ def heuristic_sort(pool: List[Transaction],
     return _apply_nonce_order(result)
 
 
+def fee_risk_linear_sort(pool: List[Transaction],
+                         lambda_f: float = C.LINEAR_LAMBDA_F,
+                         lambda_r: float = C.LINEAR_LAMBDA_R
+                         ) -> List[Transaction]:
+    """score(tx) = λ_f · fee_norm − λ_r · risk_score, 按分数降序"""
+    if not pool:
+        return []
+    max_fee = max(tx.fee for tx in pool)
+    ordered = sorted(pool,
+                     key=lambda tx: -(lambda_f * (tx.fee / max_fee)
+                                      - lambda_r * tx.risk_score))
+    return _apply_nonce_order(ordered)
+
+
+def fair_fee_sort(pool: List[Transaction],
+                  lambda_f: float = C.FAIR_LAMBDA_F,
+                  lambda_w: float = C.FAIR_LAMBDA_W
+                  ) -> List[Transaction]:
+    """score(tx) = λ_f · fee_norm + λ_w · wait_norm, 按分数降序"""
+    if not pool:
+        return []
+    max_fee = max(tx.fee for tx in pool)
+    t_now = max(tx.arrival_time for tx in pool) + 1.0
+    t_max = max(tx.arrival_time for tx in pool)
+    if t_max < 1e-8:
+        t_max = 1.0
+    ordered = sorted(pool,
+                     key=lambda tx: -(lambda_f * (tx.fee / max_fee)
+                                      + lambda_w * ((t_now - tx.arrival_time) / t_max)))
+    return _apply_nonce_order(ordered)
+
+
 def run_baseline(pool: List[Transaction],
                  method: str) -> List[Transaction]:
     """统一接口"""
@@ -81,5 +113,9 @@ def run_baseline(pool: List[Transaction],
         return gas_priority_sort(pool)
     elif method == "heuristic":
         return heuristic_sort(pool)
+    elif method == "fee_risk_linear":
+        return fee_risk_linear_sort(pool)
+    elif method == "fair_fee":
+        return fair_fee_sort(pool)
     else:
         raise ValueError(f"Unknown baseline: {method}")
