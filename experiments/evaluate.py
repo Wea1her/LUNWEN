@@ -264,7 +264,8 @@ def main():
     parser = argparse.ArgumentParser(description="评估与对比")
     parser.add_argument("--model", type=str, default="checkpoints/best_model.pt")
     parser.add_argument("--episodes", type=int, default=C.EVAL_EPISODES)
-    parser.add_argument("--pool-size", type=int, default=C.POOL_SIZE_DEFAULT)
+    parser.add_argument("--pool-size", type=C.validate_pool_size,
+                        default=C.POOL_SIZE_DEFAULT)
     parser.add_argument("--risk-ratio", type=float, default=C.RISK_RATIO)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=str, default="results")

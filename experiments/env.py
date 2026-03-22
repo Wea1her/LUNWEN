@@ -34,6 +34,8 @@ class TxOrderingEnv(gym.Env):
                  no_stop: bool = False,
                  no_action_mask: bool = False):
         super().__init__()
+        if pool_size is not None:
+            C.validate_pool_size(pool_size)
         self.pool_size = pool_size
         self.risk_ratio = risk_ratio
         self.max_pool = max_pool

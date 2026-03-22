@@ -57,3 +57,14 @@ SEEDS = [42, 123, 456, 789, 2025]
 ROBUSTNESS_RISK_RATIOS = [0.05, 0.10, 0.15, 0.20, 0.30]
 ROBUSTNESS_POOL_SIZES = [100, 200, 300, 500]
 ROBUSTNESS_FEE_MULTIPLIERS = [1.2, 1.5, 2.0, 3.0]
+
+
+def validate_pool_size(value: int) -> int:
+    """校验 CLI / 运行时传入的候选池大小。"""
+    pool_size = int(value)
+    if not (POOL_SIZE_MIN <= pool_size <= POOL_SIZE_MAX):
+        raise ValueError(
+            f"pool_size must be in [{POOL_SIZE_MIN}, {POOL_SIZE_MAX}], "
+            f"got {pool_size}"
+        )
+    return pool_size

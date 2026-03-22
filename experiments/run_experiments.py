@@ -251,7 +251,8 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=C.SEEDS)
     parser.add_argument("--episodes", type=int, default=C.TOTAL_EPISODES)
     parser.add_argument("--eval-episodes", type=int, default=C.EVAL_EPISODES)
-    parser.add_argument("--pool-size", type=int, default=C.POOL_SIZE_DEFAULT)
+    parser.add_argument("--pool-size", type=C.validate_pool_size,
+                        default=C.POOL_SIZE_DEFAULT)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--output", type=str, default="results_final")
     parser.add_argument("--skip-train", action="store_true",
@@ -337,7 +338,7 @@ def main():
     )
 
     # 统计显著性检验
-    if SCIPY_AVAILABLE:
+    if SCIPY_AVAILABLE and len(all_main) >= 2:
         print("\n===== 统计显著性检验 =====")
         sig = run_significance_tests(all_main)
         print(format_significance_table(sig))
@@ -349,7 +350,10 @@ def main():
         print(f"显著性检验已保存: {sig_path}, {sig_tex}")
     else:
         print("\n===== 统计显著性检验 =====")
-        print("Warning: scipy 未安装, 跳过显著性检验与对应 LaTeX 表格生成。")
+        if not SCIPY_AVAILABLE:
+            print("Warning: scipy 未安装, 跳过显著性检验与对应 LaTeX 表格生成。")
+        else:
+            print("Warning: 显著性检验至少需要 2 个 seed, 当前已跳过。")
 
     # 消融实验 (并行)
     if args.ablation:
