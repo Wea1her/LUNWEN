@@ -2,12 +2,28 @@
 
 import json
 import numpy as np
-from scipy import stats
 from typing import Optional
+
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    stats = None
+    SCIPY_AVAILABLE = False
+
+
+def ensure_scipy():
+    """确保统计检验依赖可用。"""
+    if not SCIPY_AVAILABLE:
+        raise RuntimeError(
+            "scipy is required for significance testing. "
+            "Install it with `pip install -r experiments/requirements.txt`."
+        )
 
 
 def welch_ttest(vals_a: list[float], vals_b: list[float]) -> dict:
     """双样本 Welch t 检验 (不假设等方差)"""
+    ensure_scipy()
     a, b = np.array(vals_a), np.array(vals_b)
     if len(a) < 2 or len(b) < 2:
         return {"t_stat": 0.0, "p_value": 1.0}
@@ -33,6 +49,7 @@ def cohens_d(vals_a: list[float], vals_b: list[float]) -> float:
 
 def confidence_interval(vals: list[float], confidence: float = 0.95) -> tuple:
     """均值的 t 分布置信区间"""
+    ensure_scipy()
     a = np.array(vals)
     n = len(a)
     mean = a.mean()
@@ -43,6 +60,7 @@ def confidence_interval(vals: list[float], confidence: float = 0.95) -> tuple:
 
 def mann_whitney_u(vals_a: list[float], vals_b: list[float]) -> dict:
     """Mann-Whitney U 检验 (非参数)"""
+    ensure_scipy()
     u_stat, p_value = stats.mannwhitneyu(vals_a, vals_b, alternative="two-sided")
     return {"u_stat": float(u_stat), "p_value": float(p_value)}
 
