@@ -102,10 +102,13 @@ class TxOrderingEnv(gym.Env):
 
         # STOP 动作或无效动作
         if action == stop_idx or action not in valid:
-            # r_valid: 若还有合法候选却选择停止, 施加惩罚
             stop_penalty = 0.0
             if action == stop_idx and len(valid) > 0:
-                stop_penalty = -self.eta
+                # 惩罚与剩余可打包价值挂钩: 剩余合法交易的平均收益 × 剩余数量的对数
+                remaining_fees = [self._candidates[i].fee for i in valid]
+                avg_remaining = sum(remaining_fees) / (len(remaining_fees) * max(self._max_fee, 1e-8))
+                import math
+                stop_penalty = -self.eta * (1.0 + avg_remaining * math.log1p(len(valid)))
             self._done = True
             return self._obs(), stop_penalty, True, False, self._info()
 
@@ -226,7 +229,14 @@ class TxOrderingEnv(gym.Env):
             valid = self._valid_indices()
             for idx in valid:
                 mask[idx] = 1
-        mask[n] = 0 if self.no_stop else 1  # STOP 动作控制
+        # STOP 掩码: 早期强制禁用, 要求至少打包一定比例后才允许 STOP
+        min_steps_before_stop = max(int(len(self._pool) * 0.3), 10)
+        if self.no_stop:
+            mask[n] = 0
+        elif self._step_count < min_steps_before_stop:
+            mask[n] = 0  # 打包不足 30% 前禁止 STOP
+        else:
+            mask[n] = 1
 
         return {
             "tx_features": features,
