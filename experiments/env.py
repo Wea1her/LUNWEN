@@ -1,6 +1,7 @@
 """交易排序仿真环境 (Gymnasium 兼容)"""
 
 from __future__ import annotations
+from copy import deepcopy
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
@@ -33,6 +34,8 @@ class TxOrderingEnv(gym.Env):
                  no_stop: bool = False,
                  no_action_mask: bool = False):
         super().__init__()
+        if pool_size is not None:
+            C.validate_pool_size(pool_size)
         self.pool_size = pool_size
         self.risk_ratio = risk_ratio
         self.max_pool = max_pool
@@ -69,6 +72,7 @@ class TxOrderingEnv(gym.Env):
         self._max_gas = 1
         self._t_max = 1.0
         self._done = False
+        self._invalid_action_streak = 0
 
     # ------------------------------------------------------------------
     # Gym API
@@ -79,19 +83,28 @@ class TxOrderingEnv(gym.Env):
             self.rng = np.random.default_rng(seed)
 
         self._pool = generate_pool(self.rng, self.pool_size, self.risk_ratio)
+        return self._reset_from_current_pool(), {}
+
+    def reset_with_pool(self, pool: list[Transaction]) -> tuple[dict, dict]:
+        """使用给定交易池重置环境, 便于方法间公平对比。"""
+        self._pool = deepcopy(pool)
+        return self._reset_from_current_pool(), {}
+
+    def _reset_from_current_pool(self) -> dict:
         self._candidates = list(self._pool)
         self._selected = []
         self._remaining_gas = C.MAX_BLOCK_GAS
         self._acc_fee = 0.0
         self._step_count = 0
         self._done = False
+        self._invalid_action_streak = 0
 
         self._max_fee = max(tx.fee for tx in self._pool) if self._pool else 1.0
         self._max_gas = max(tx.gas for tx in self._pool) if self._pool else 1
         self._t_max = max(tx.arrival_time for tx in self._pool) if self._pool else 1.0
         self._t_now = self._t_max + 1.0
 
-        return self._obs(), {}
+        return self._obs()
 
     def step(self, action: int) -> tuple[dict, float, bool, bool, dict]:
         if self._done:
@@ -113,9 +126,15 @@ class TxOrderingEnv(gym.Env):
 
         # 无效动作: 不终止, 施加小惩罚, 状态不变
         if action not in valid:
-            return self._obs(), -self.eta, False, False, self._info()
+            self._invalid_action_streak += 1
+            penalty = -self.eta * (1.0 + 0.1 * self._invalid_action_streak)
+            if self.no_action_mask or self._invalid_action_streak >= max(len(self._candidates), 10):
+                self._done = True
+                return self._obs(), penalty, True, False, self._info()
+            return self._obs(), penalty, False, False, self._info()
 
         tx = self._candidates[action]
+        self._invalid_action_streak = 0
 
         # 计算即时奖励
         reward = self._compute_reward(tx)

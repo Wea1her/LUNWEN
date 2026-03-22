@@ -1,6 +1,7 @@
 """评估脚本: 对比 RL 方法与基线, 生成指标表格与图表"""
 
 import argparse
+from copy import deepcopy
 import os
 import json
 import numpy as np
@@ -12,14 +13,27 @@ from networks import ActorCritic
 from baselines import run_baseline
 from metrics import compute_all_metrics
 from device_utils import resolve_device
+from transaction import generate_pool
+
+
+def build_shared_pools(n_episodes: int, pool_size: int,
+                       risk_ratio: float, seed: int) -> list[list]:
+    """为不同方法预生成完全一致的评估交易池。"""
+    rng = np.random.default_rng(seed)
+    return [generate_pool(rng, pool_size, risk_ratio) for _ in range(n_episodes)]
 
 
 def evaluate_rl(model: ActorCritic, env: TxOrderingEnv,
-                n_episodes: int, device: torch.device) -> list[dict]:
+                n_episodes: int, device: torch.device,
+                shared_pools: list[list] | None = None) -> list[dict]:
     """运行训练好的 RL 模型, 收集指标"""
     results = []
-    for _ in range(n_episodes):
-        obs, _ = env.reset()
+    pools = shared_pools if shared_pools is not None else [None] * n_episodes
+    for pool in pools:
+        if pool is None:
+            obs, _ = env.reset()
+        else:
+            obs, _ = env.reset_with_pool(pool)
         while True:
             action, _, _ = model.act(obs, device, greedy=True)
             obs, _, done, _, info = env.step(action)
@@ -33,14 +47,19 @@ def evaluate_rl(model: ActorCritic, env: TxOrderingEnv,
 
 
 def evaluate_baseline(method: str, env: TxOrderingEnv,
-                      n_episodes: int) -> list[dict]:
+                      n_episodes: int,
+                      shared_pools: list[list] | None = None) -> list[dict]:
     """运行基线方法, 收集指标"""
     results = []
-    for _ in range(n_episodes):
-        env.reset()
-        pool = env.get_pool()
-        selected = run_baseline(pool, method)
-        m = compute_all_metrics(selected, pool)
+    pools = shared_pools if shared_pools is not None else [None] * n_episodes
+    for pool in pools:
+        if pool is None:
+            env.reset()
+        else:
+            env.reset_with_pool(pool)
+        current_pool = env.get_pool()
+        selected = run_baseline(deepcopy(current_pool), method)
+        m = compute_all_metrics(selected, current_pool)
         results.append(m)
     return results
 
@@ -80,10 +99,13 @@ def run_robustness(model, device, n_episodes, pool_size, seed,
     print("\n===== 鲁棒性分析 =====")
     for rr in risk_ratios:
         env = TxOrderingEnv(pool_size=pool_size, risk_ratio=rr, seed=seed)
+        shared_pools = build_shared_pools(n_episodes, pool_size, rr, seed)
         results = {}
-        results["RL"] = aggregate(evaluate_rl(model, env, n_episodes, device))
+        results["RL"] = aggregate(
+            evaluate_rl(model, env, n_episodes, device, shared_pools))
         for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
-            results[bl] = aggregate(evaluate_baseline(bl, env, n_episodes))
+            results[bl] = aggregate(
+                evaluate_baseline(bl, env, n_episodes, shared_pools))
         print(f"\n--- risk_ratio = {rr:.0%} ---")
         print_table(results)
         all_data[str(rr)] = results
@@ -103,10 +125,13 @@ def run_pool_size_robustness(model, device, n_episodes, risk_ratio, seed,
     print("\n===== 候选池规模鲁棒性 =====")
     for ps in pool_sizes:
         env = TxOrderingEnv(pool_size=ps, risk_ratio=risk_ratio, seed=seed)
+        shared_pools = build_shared_pools(n_episodes, ps, risk_ratio, seed)
         results = {}
-        results["RL"] = aggregate(evaluate_rl(model, env, n_episodes, device))
+        results["RL"] = aggregate(
+            evaluate_rl(model, env, n_episodes, device, shared_pools))
         for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
-            results[bl] = aggregate(evaluate_baseline(bl, env, n_episodes))
+            results[bl] = aggregate(
+                evaluate_baseline(bl, env, n_episodes, shared_pools))
         print(f"\n--- pool_size = {ps} ---")
         print_table(results)
         all_data[str(ps)] = results
@@ -121,7 +146,6 @@ def run_pool_size_robustness(model, device, n_episodes, risk_ratio, seed,
 def run_fee_multiplier_robustness(model, device, n_episodes, pool_size, seed,
                                   output_dir="results"):
     """不同风险费率倍率下的鲁棒性实验"""
-    from transaction import generate_pool
     multipliers = C.ROBUSTNESS_FEE_MULTIPLIERS
     all_data = {}
     print("\n===== 风险费率倍率鲁棒性 =====")
@@ -129,23 +153,21 @@ def run_fee_multiplier_robustness(model, device, n_episodes, pool_size, seed,
         # 临时修改倍率, 通过自定义交易池实现
         env = TxOrderingEnv(pool_size=pool_size, risk_ratio=C.RISK_RATIO,
                             seed=seed)
+        shared_pools = build_shared_pools(n_episodes, pool_size, C.RISK_RATIO,
+                                          seed)
         results = {}
         eval_results_rl = []
         eval_results_bl = {bl: [] for bl in ["fifo", "gas", "heuristic",
                                               "fee_risk_linear", "fair_fee"]}
-        for _ in range(n_episodes):
-            env.reset()
-            pool = env.get_pool()
+        for base_pool in shared_pools:
+            pool = deepcopy(base_pool)
             # 修改风险交易费率倍率
             for tx in pool:
                 if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD:
                     tx.fee = tx.fee / C.RISK_FEE_MULTIPLIER * mult
-            env._pool = pool
-            env._candidates = list(pool)
-            env._max_fee = max(tx.fee for tx in pool)
+            obs, _ = env.reset_with_pool(pool)
 
             # RL 评估
-            obs = env._obs()
             while True:
                 action, _, _ = model.act(obs, device, greedy=True)
                 obs, _, done, _, info = env.step(action)
@@ -156,7 +178,7 @@ def run_fee_multiplier_robustness(model, device, n_episodes, pool_size, seed,
 
             # 基线评估
             for bl in eval_results_bl:
-                sel_bl = run_baseline(pool, bl)
+                sel_bl = run_baseline(deepcopy(pool), bl)
                 eval_results_bl[bl].append(compute_all_metrics(sel_bl, pool))
 
         results["RL"] = aggregate(eval_results_rl)
@@ -242,7 +264,8 @@ def main():
     parser = argparse.ArgumentParser(description="评估与对比")
     parser.add_argument("--model", type=str, default="checkpoints/best_model.pt")
     parser.add_argument("--episodes", type=int, default=C.EVAL_EPISODES)
-    parser.add_argument("--pool-size", type=int, default=C.POOL_SIZE_DEFAULT)
+    parser.add_argument("--pool-size", type=C.validate_pool_size,
+                        default=C.POOL_SIZE_DEFAULT)
     parser.add_argument("--risk-ratio", type=float, default=C.RISK_RATIO)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=str, default="results")
@@ -279,12 +302,14 @@ def main():
                         risk_ratio=args.risk_ratio, seed=args.seed)
     print("===== 主实验结果 =====")
     all_results = {}
+    shared_pools = build_shared_pools(args.episodes, args.pool_size,
+                                      args.risk_ratio, args.seed)
     all_results["RL (Ours)"] = aggregate(
-        evaluate_rl(model, env, args.episodes, device))
+        evaluate_rl(model, env, args.episodes, device, shared_pools))
     for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
         label = bl.upper().replace("FEE_RISK_LINEAR", "FeeRiskLinear").replace("FAIR_FEE", "FairFee")
         all_results[label] = aggregate(
-            evaluate_baseline(bl, env, args.episodes))
+            evaluate_baseline(bl, env, args.episodes, shared_pools))
     print_table(all_results)
 
     # 保存结果
