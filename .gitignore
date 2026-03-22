@@ -15,3 +15,4 @@ experiments/__pycache__/
 # Ignore the .articlewriting-skill directory created by the Article Writing Skill extension for Visual Studio Code
 articlewriting-skill
 
+.claude/CLAUDE.md/
