@@ -1,0 +1,12 @@
+{
+  "seed": 42,
+  "dimension": "fee_multiplier",
+  "base_shared_pool_file": "shared_pools_robust_fee_seed42_base.json",
+  "multipliers": [
+    1.2,
+    1.5,
+    2.0,
+    3.0
+  ],
+  "transform_rule": "if tx.risk_score >= HEURISTIC_RISK_THRESHOLD: tx.fee = tx.fee / RISK_FEE_MULTIPLIER * multiplier"
+}
