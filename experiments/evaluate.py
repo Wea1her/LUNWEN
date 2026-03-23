@@ -104,6 +104,22 @@ def aggregate(results: list[dict]) -> dict:
     return agg
 
 
+def episode_rows(raw: dict[str, list[dict]], setting: str, setting_value) -> list[dict]:
+    """将方法级 episode 指标序列展开为逐行记录。"""
+    rows = []
+    for method, metrics_seq in raw.items():
+        for episode_id, metrics in enumerate(metrics_seq):
+            rows.append({
+                "setting": setting,
+                "setting_value": setting_value,
+                "method": method,
+                "episode_id": episode_id,
+                "shared_pool_id": episode_id,
+                "metrics": metrics,
+            })
+    return rows
+
+
 def print_table(all_results: dict[str, dict]):
     """打印结果表"""
     print(f"{'方法':<20s} {'区块收益':>10s} {'公平性':>10s} "
@@ -315,6 +331,8 @@ def main():
                         help="绘制训练曲线")
     parser.add_argument("--train-log", type=str,
                         default="checkpoints/train_log.json")
+    parser.add_argument("--allow-random-fallback", action="store_true",
+                        help="模型不存在时允许回退为随机策略评估")
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)
@@ -330,28 +348,65 @@ def main():
         model.load_state_dict(torch.load(args.model, map_location=device,
                                          weights_only=True))
         print(f"Loaded model: {args.model}")
-    else:
+        policy_source = "trained"
+    elif args.allow_random_fallback:
         print(f"Warning: {args.model} not found, using random policy")
+        policy_source = "random_fallback"
+    else:
+        raise FileNotFoundError(
+            f"required checkpoint not found: {args.model}. "
+            "Use --allow-random-fallback to force random-policy evaluation."
+        )
     model.eval()
 
     # 主对比实验
     env = TxOrderingEnv(pool_size=args.pool_size,
                         risk_ratio=args.risk_ratio, seed=args.seed)
     print("===== 主实验结果 =====")
-    all_results = {}
     shared_pools = build_shared_pools(args.episodes, args.pool_size,
                                       args.risk_ratio, args.seed)
-    all_results["RL (Ours)"] = aggregate(
-        evaluate_rl(model, env, args.episodes, device, shared_pools))
+    save_shared_pools(
+        os.path.join(args.output, f"shared_pools_main_seed{args.seed}.json"),
+        shared_pools,
+        metadata={
+            "seed": args.seed,
+            "episodes": args.episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": args.risk_ratio,
+            "setting": "main",
+        },
+    )
+    raw_results = {
+        "RL (Ours)": evaluate_rl(model, env, args.episodes, device, shared_pools)
+    }
     for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
         label = bl.upper().replace("FEE_RISK_LINEAR", "FeeRiskLinear").replace("FAIR_FEE", "FairFee")
-        all_results[label] = aggregate(
-            evaluate_baseline(bl, env, args.episodes, shared_pools))
+        raw_results[label] = evaluate_baseline(bl, env, args.episodes, shared_pools)
+    all_results = {
+        method: aggregate(metrics)
+        for method, metrics in raw_results.items()
+    }
     print_table(all_results)
 
     # 保存结果
     with open(os.path.join(args.output, "main_results.json"), "w") as f:
         json.dump(all_results, f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "main_aggregated_metrics.json"), "w") as f:
+        json.dump({
+            "policy_source": policy_source,
+            "metrics": all_results,
+        }, f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "main_episode_metrics.json"), "w") as f:
+        json.dump({
+            "policy_source": policy_source,
+            "setting": "main",
+            "seed": args.seed,
+            "records": episode_rows(
+                raw_results,
+                "main",
+                {"pool_size": args.pool_size, "risk_ratio": args.risk_ratio},
+            ),
+        }, f, indent=2, ensure_ascii=False)
 
     # 鲁棒性实验
     if args.robustness:
