@@ -99,7 +99,16 @@
 
 该设计使高风险交易位于头尾敏感区时受到更强惩罚，位于中间核心区时惩罚最小，符合抢跑/尾随攻击的常见位置特征。
 
-有效性项 $r_t^{\text{valid}}$ 用于约束策略滥用终止动作。当仍存在合法候选交易时若智能体提前选择 \texttt{STOP}，则施加负奖励；其余情况下该项为 0。该机制可避免策略通过“过早停止”逃避困难决策。
+有效性项 $r_t^{\text{valid}}$ 同时约束“过早终止”和“非法动作”两类无效决策。其定义为：
+\begin{equation}
+  r_t^{\text{valid}}=
+  \begin{cases}
+    -\left(1+\bar{f}^{\text{rem}}_t \cdot \log\!\left(1+\left|\mathcal{A}_t^{\text{valid}}\right|\right)\right), & a_t=\texttt{STOP},\ \left|\mathcal{A}_t^{\text{valid}}\right|>0 \\
+    -\left(1+0.1\cdot n_t^{\text{inv}}\right), & a_t\notin \mathcal{A}_t^{\text{valid}} \\
+    0, & \text{其他情况}
+  \end{cases}
+\end{equation}
+其中 $\bar{f}^{\text{rem}}_t$ 表示剩余合法候选交易的归一化平均手续费，$n_t^{\text{inv}}$ 表示当前回合内连续非法动作计数。该设计用于抑制“提前 \texttt{STOP} 逃避决策”与“连续输出非法动作”的策略行为；在 No-ActionMask 消融下，若非法动作连续累积超过阈值，环境会提前结束回合。
 
 在本文实验配置中，默认取 $\alpha = 1.0$、$\beta = 0.3$、$\gamma = 0.5$、$\eta = 0.1$。收益项保持主导地位，公平与风险项负责多目标折中，有效性项用于稳定训练行为边界。
 
