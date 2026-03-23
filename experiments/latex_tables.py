@@ -2,25 +2,7 @@
 
 import json
 
-METHOD_ORDER = ["FIFO", "GAS", "HEURISTIC", "FeeRiskLinear", "FairFee", "RL (Ours)"]
-METHOD_LABELS = {
-    "FIFO": "FIFO",
-    "GAS": "Gas 优先",
-    "HEURISTIC": "Heuristic",
-    "FeeRiskLinear": "Fee-Risk Linear",
-    "FairFee": "Fair-Fee Greedy",
-    "RL (Ours)": "本文方法",
-}
-
-ROB_METHOD_ORDER = ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee", "RL"]
-ROB_METHOD_LABELS = {
-    "fifo": "FIFO",
-    "gas": "Gas 优先",
-    "heuristic": "Heuristic",
-    "fee_risk_linear": "Fee-Risk Linear",
-    "fair_fee": "Fair-Fee Greedy",
-    "RL": "本文方法",
-}
+from method_registry import MAIN_METHOD_ORDER, latex_name, normalize_method_id
 
 ABLATION_ORDER = ["Ours-FeeOnly", "Ours-Fee+Fair", "Ours-Fee+Risk", "Ours-Full"]
 ABLATION_LABELS = {
@@ -43,6 +25,17 @@ def _fmt(mean, std, precision=2):
     return f"${mean:.{precision}f} \\pm {std:.{precision}f}$"
 
 
+def _normalize_method_keyed_dict(data: dict) -> dict:
+    normalized = {}
+    for key, value in data.items():
+        try:
+            method_id = normalize_method_id(key)
+        except KeyError:
+            method_id = key
+        normalized[method_id] = value
+    return normalized
+
+
 def _highlight_ranked(raw_values, rendered_values, higher_better=True):
     """按数值排序后，对最优值加粗、次优值下划线。"""
     indexed = [(v, i) for i, v in enumerate(raw_values)]
@@ -58,6 +51,7 @@ def _highlight_ranked(raw_values, rendered_values, higher_better=True):
 
 def generate_main_table(agg: dict) -> str:
     """生成主实验表: 6 方法 × 6 指标, 最优加粗, 次优下划线"""
+    agg = _normalize_method_keyed_dict(agg)
     metrics = [
         ("block_fee", 1, True),
         ("fairness", 4, True),
@@ -67,7 +61,7 @@ def generate_main_table(agg: dict) -> str:
         ("packing_ratio", 4, True),
     ]
 
-    present = [m for m in METHOD_ORDER if m in agg]
+    present = [m for m in MAIN_METHOD_ORDER if m in agg]
 
     # 收集每个指标的格式化值
     col_data = []
@@ -94,7 +88,7 @@ def generate_main_table(agg: dict) -> str:
 
     lines = []
     for row_idx, m in enumerate(present):
-        cells = [METHOD_LABELS[m]]
+        cells = [latex_name(m)]
         for col in col_data:
             cells.append(col[row_idx])
         lines.append(" & ".join(cells) + " \\\\")
@@ -104,16 +98,16 @@ def generate_main_table(agg: dict) -> str:
 def generate_robustness_table(agg_rob: dict) -> str:
     """生成鲁棒性表"""
     ratios = sorted(agg_rob.keys(), key=float)
-    present = [m for m in ROB_METHOD_ORDER
-               if m in agg_rob[ratios[0]]]
+    normalized = {ratio: _normalize_method_keyed_dict(agg_rob[ratio]) for ratio in ratios}
+    present = [m for m in MAIN_METHOD_ORDER if m in normalized[ratios[0]]]
     lines = []
     for m in present:
-        cells = [ROB_METHOD_LABELS[m]]
+        cells = [latex_name(m)]
         for rr in ratios:
-            d = agg_rob[rr][m]
+            d = normalized[rr][m]
             cells.append(_fmt(d["block_fee_mean"], d["block_fee_std"], 1))
         for rr in ratios:
-            d = agg_rob[rr][m]
+            d = normalized[rr][m]
             cells.append(_fmt(d["risk_exposure_mean"], d["risk_exposure_std"], 4))
         lines.append(" & ".join(cells) + " \\\\")
     return "\n".join(lines) + "\n"

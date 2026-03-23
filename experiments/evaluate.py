@@ -14,6 +14,7 @@ from networks import ActorCritic
 from baselines import run_baseline
 from metrics import compute_all_metrics
 from device_utils import resolve_device
+from method_registry import BASELINE_METHOD_IDS, display_name
 from transaction import Transaction, generate_pool
 
 
@@ -127,7 +128,11 @@ def print_table(all_results: dict[str, dict]):
           f"{'风险排名':>10s} {'打包比':>10s}")
     print("-" * 90)
     for name, agg in all_results.items():
-        print(f"{name:<20s} "
+        try:
+            method_label = display_name(name)
+        except KeyError:
+            method_label = name
+        print(f"{method_label:<20s} "
               f"{agg['block_fee_mean']:>8.1f}±{agg['block_fee_std']:<4.1f} "
               f"{agg['fairness_mean']:>8.4f} "
               f"{agg['risk_exposure_mean']:>8.4f} "
@@ -146,9 +151,9 @@ def run_robustness(model, device, n_episodes, pool_size, seed,
         env = TxOrderingEnv(pool_size=pool_size, risk_ratio=rr, seed=seed)
         shared_pools = build_shared_pools(n_episodes, pool_size, rr, seed)
         results = {}
-        results["RL"] = aggregate(
+        results["ours"] = aggregate(
             evaluate_rl(model, env, n_episodes, device, shared_pools))
-        for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
+        for bl in BASELINE_METHOD_IDS:
             results[bl] = aggregate(
                 evaluate_baseline(bl, env, n_episodes, shared_pools))
         print(f"\n--- risk_ratio = {rr:.0%} ---")
@@ -172,9 +177,9 @@ def run_pool_size_robustness(model, device, n_episodes, risk_ratio, seed,
         env = TxOrderingEnv(pool_size=ps, risk_ratio=risk_ratio, seed=seed)
         shared_pools = build_shared_pools(n_episodes, ps, risk_ratio, seed)
         results = {}
-        results["RL"] = aggregate(
+        results["ours"] = aggregate(
             evaluate_rl(model, env, n_episodes, device, shared_pools))
-        for bl in ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]:
+        for bl in BASELINE_METHOD_IDS:
             results[bl] = aggregate(
                 evaluate_baseline(bl, env, n_episodes, shared_pools))
         print(f"\n--- pool_size = {ps} ---")
@@ -202,8 +207,7 @@ def run_fee_multiplier_robustness(model, device, n_episodes, pool_size, seed,
                                           seed)
         results = {}
         eval_results_rl = []
-        eval_results_bl = {bl: [] for bl in ["fifo", "gas", "heuristic",
-                                              "fee_risk_linear", "fair_fee"]}
+        eval_results_bl = {bl: [] for bl in BASELINE_METHOD_IDS}
         for base_pool in shared_pools:
             pool = deepcopy(base_pool)
             # 修改风险交易费率倍率
@@ -226,7 +230,7 @@ def run_fee_multiplier_robustness(model, device, n_episodes, pool_size, seed,
                 sel_bl = run_baseline(deepcopy(pool), bl)
                 eval_results_bl[bl].append(compute_all_metrics(sel_bl, pool))
 
-        results["RL"] = aggregate(eval_results_rl)
+        results["ours"] = aggregate(eval_results_rl)
         for bl in eval_results_bl:
             results[bl] = aggregate(eval_results_bl[bl])
 

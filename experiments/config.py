@@ -15,6 +15,7 @@ RISK_SCORE_HIGH = (0.5, 1.0) # 风险交易评分范围
 RISK_SCORE_LOW = (0.0, 0.3)  # 普通交易评分范围
 ARRIVAL_RATE = 1.0           # 泊松到达率 (笔/秒)
 RISK_FEE_MULTIPLIER = 2.0    # 风险交易手续费倍率
+POOL_REALISM_MODE = "correlated_v1"  # 交易池生成模式: iid_baseline / correlated_v1
 
 # ========== 奖励函数 ==========
 ALPHA = 1.0   # 手续费收益权重
@@ -45,16 +46,24 @@ HEURISTIC_RISK_THRESHOLD = 0.5  # 启发式风险阈值
 # ========== 评估 ==========
 EVAL_EPISODES = 1000
 RISK_POSITION_RATIO = 0.1  # 风险暴露度: 头/尾 10%
+VALIDATION_EPISODES = 64
+VALIDATION_INTERVAL = 50
+VALIDATION_METRIC = "block_fee"
+LOWER_IS_BETTER_METRICS = ("risk_exposure",)
+VALIDATION_SEED_OFFSET = 10000
 BEST_CHECKPOINT_NAME = "best_model.pt"
 FINAL_CHECKPOINT_NAME = "final_model.pt"
 FORMAL_EVAL_CHECKPOINT_NAME = BEST_CHECKPOINT_NAME
-FORMAL_EVAL_CHECKPOINT_RULE = "best_episode_reward"
+FORMAL_EVAL_CHECKPOINT_RULE = "best_fixed_validation_pool_metric"
 
 # ========== 新增基线参数 ==========
 LINEAR_LAMBDA_F = 1.0   # Fee-Risk 线性评分: 手续费权重
 LINEAR_LAMBDA_R = 0.5   # Fee-Risk 线性评分: 风险惩罚权重
 FAIR_LAMBDA_F = 1.0      # Fair-Fee 双目标: 手续费权重
 FAIR_LAMBDA_W = 0.5      # Fair-Fee 双目标: 等待时间权重
+CENTER_AWARE_LAMBDA_F = 1.0
+CENTER_AWARE_LAMBDA_W = 0.4
+CENTER_AWARE_LATE_PROMO = 0.2
 
 # ========== 多种子与鲁棒性 ==========
 SEEDS = [42, 123, 456, 789, 2025]
