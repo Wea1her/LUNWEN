@@ -174,6 +174,104 @@ def composite_score(metrics: dict,
     )
 
 
+def constrained_success_score(metrics: dict,
+                              constraints: dict | None = None,
+                              target_metric: str = "block_fee_norm",
+                              infeasible_score: float = -1.0) -> float:
+    """约束式得分: 满足约束时返回目标指标，否则给不可行分。"""
+    cons = constraints or {}
+    fairness_floor = float(cons.get("fairness_floor", C.VALIDATION_FAIRNESS_FLOOR))
+    oldest_floor = float(cons.get("oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR))
+    risk_ceil = float(cons.get("risk_ceil", C.VALIDATION_RISK_CEIL))
+    top10_risk_ceil = float(cons.get("top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL))
+
+    fairness = float(metrics.get("fairness", 0.0))
+    oldest_cov = float(metrics.get("oldest_coverage", 0.0))
+    risk = float(metrics.get("risk_exposure", 1.0))
+    top10_risk = float(metrics.get("top10_risk", 1.0))
+    feasible = (
+        fairness >= fairness_floor
+        and oldest_cov >= oldest_floor
+        and risk <= risk_ceil
+        and top10_risk <= top10_risk_ceil
+    )
+    if not feasible:
+        return float(infeasible_score)
+    return float(metrics.get(target_metric, 0.0))
+
+
+def risk_adjusted_fee_score(metrics: dict,
+                            lambda_risk: float = C.RISK_ADJUSTED_FEE_LAMBDA) -> float:
+    """风险调整收益分：fee_norm - λ·risk_exposure。"""
+    fee_norm = float(metrics.get("block_fee_norm", 0.0))
+    risk = float(np.clip(metrics.get("risk_exposure", 0.0), 0.0, 1.0))
+    return fee_norm - lambda_risk * risk
+
+
+def pareto_dominates(a: dict,
+                     b: dict,
+                     objectives: list[str],
+                     lower_is_better: set[str] | None = None,
+                     eps: float = 1e-12) -> bool:
+    """判断 a 是否 Pareto 支配 b。"""
+    lower = lower_is_better or set()
+    no_worse_all = True
+    strictly_better = False
+    for m in objectives:
+        av = float(a.get(m, 0.0))
+        bv = float(b.get(m, 0.0))
+        if m in lower:
+            if av > bv + eps:
+                no_worse_all = False
+                break
+            if av < bv - eps:
+                strictly_better = True
+        else:
+            if av < bv - eps:
+                no_worse_all = False
+                break
+            if av > bv + eps:
+                strictly_better = True
+    return no_worse_all and strictly_better
+
+
+def pareto_dominance_rate(
+    ours_metrics_seq: list[dict],
+    baseline_metrics_seq: list[dict],
+    objectives: list[str] | None = None,
+    lower_is_better: set[str] | None = None,
+) -> dict:
+    """逐 episode 计算 Pareto dominance 比率。"""
+    if objectives is None:
+        objectives = ["block_fee", "fairness", "risk_exposure", "oldest_coverage"]
+    if lower_is_better is None:
+        lower_is_better = {"risk_exposure"}
+    n = min(len(ours_metrics_seq), len(baseline_metrics_seq))
+    if n == 0:
+        return {
+            "n_pairs": 0,
+            "ours_dominates_rate": 0.0,
+            "baseline_dominates_rate": 0.0,
+            "non_dominated_rate": 0.0,
+        }
+    ours_dom = 0
+    base_dom = 0
+    for i in range(n):
+        ours = ours_metrics_seq[i]
+        base = baseline_metrics_seq[i]
+        if pareto_dominates(ours, base, objectives, lower_is_better):
+            ours_dom += 1
+        elif pareto_dominates(base, ours, objectives, lower_is_better):
+            base_dom += 1
+    non_dom = n - ours_dom - base_dom
+    return {
+        "n_pairs": n,
+        "ours_dominates_rate": ours_dom / n,
+        "baseline_dominates_rate": base_dom / n,
+        "non_dominated_rate": non_dom / n,
+    }
+
+
 def compute_all_metrics(selected: List[Transaction],
                         pool: List[Transaction]) -> dict:
     """计算主指标 + 公平分解指标 + 综合分数。"""
@@ -200,4 +298,9 @@ def compute_all_metrics(selected: List[Transaction],
     pool_fee = sum(tx.fee for tx in pool) if pool else 0.0
     metrics["block_fee_norm"] = metrics["block_fee"] / max(pool_fee, 1e-8)
     metrics["composite_score"] = composite_score(metrics, pool)
+    metrics["constrained_fee_score"] = constrained_success_score(
+        metrics,
+        target_metric="block_fee_norm",
+    )
+    metrics["risk_adjusted_fee_score"] = risk_adjusted_fee_score(metrics)
     return metrics

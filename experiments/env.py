@@ -39,6 +39,18 @@ class TxOrderingEnv(gym.Env):
         beta_oldest_cover: float = C.BETA_OLDEST_COVER,
         beta_terminal_fair: float | None = None,
         gamma_starvation: float = C.GAMMA_STARVATION,
+        fairness_gate_type: str = C.FAIRNESS_GATE_TYPE,
+        fairness_gate_threshold: float = C.FAIRNESS_GATE_THRESHOLD,
+        fairness_gate_sharpness: float = C.FAIRNESS_GATE_SHARPNESS,
+        fairness_gate_min: float = C.FAIRNESS_GATE_MIN,
+        fairness_oldest_coverage_floor: float = C.FAIRNESS_OLDEST_COVERAGE_FLOOR,
+        fairness_starvation_ceil: float = C.FAIRNESS_STARVATION_CEIL,
+        packing_reward_weight: float = C.PACKING_REWARD_WEIGHT,
+        late_fee_recovery_weight: float = C.LATE_FEE_RECOVERY_WEIGHT,
+        unused_gas_penalty_weight: float = C.UNUSED_GAS_PENALTY_WEIGHT,
+        terminal_risk_exposure_weight: float = C.TERMINAL_RISK_EXPOSURE_WEIGHT,
+        terminal_top10_risk_weight: float = C.TERMINAL_TOP10_RISK_WEIGHT,
+        terminal_risky_rank_dev_weight: float = C.TERMINAL_RISKY_RANK_DEV_WEIGHT,
         no_seq_summary: bool = False,
         no_stop: bool = False,
         no_action_mask: bool = False,
@@ -59,6 +71,18 @@ class TxOrderingEnv(gym.Env):
         self.beta_oldest_cover = beta_oldest_cover
         self.beta_terminal_fair = beta if beta_terminal_fair is None else beta_terminal_fair
         self.gamma_starvation = gamma_starvation
+        self.fairness_gate_type = fairness_gate_type
+        self.fairness_gate_threshold = fairness_gate_threshold
+        self.fairness_gate_sharpness = fairness_gate_sharpness
+        self.fairness_gate_min = fairness_gate_min
+        self.fairness_oldest_coverage_floor = fairness_oldest_coverage_floor
+        self.fairness_starvation_ceil = fairness_starvation_ceil
+        self.packing_reward_weight = packing_reward_weight
+        self.late_fee_recovery_weight = late_fee_recovery_weight
+        self.unused_gas_penalty_weight = unused_gas_penalty_weight
+        self.terminal_risk_exposure_weight = terminal_risk_exposure_weight
+        self.terminal_top10_risk_weight = terminal_top10_risk_weight
+        self.terminal_risky_rank_dev_weight = terminal_risky_rank_dev_weight
 
         self.no_seq_summary = no_seq_summary
         self.no_stop = no_stop
@@ -95,6 +119,7 @@ class TxOrderingEnv(gym.Env):
         self._t_max = 1.0
         self._min_arrival = 0.0
         self._median_arrival = 0.0
+        self._median_fee = 0.0
         self._wait_norm_denom = 1.0
         self._max_fee = 1.0
         self._max_gas = 1
@@ -102,14 +127,20 @@ class TxOrderingEnv(gym.Env):
         self._invalid_action_streak = 0
         self._terminal_reward_applied = False
         self._pool_oldest_ids: set[int] = set()
+        self._pool_late_high_ids: set[int] = set()
 
         # reward 分解跟踪（按加权贡献累计）
         self._proxy_fee_reward = 0.0
         self._proxy_age_reward = 0.0
         self._proxy_oldest_cover_reward = 0.0
         self._proxy_risk_penalty = 0.0
+        self._proxy_fairness_gate = 1.0
+        self._proxy_packing_reward = 0.0
+        self._proxy_late_fee_recovery = 0.0
         self._proxy_terminal_fair = 0.0
         self._proxy_starvation_penalty = 0.0
+        self._proxy_terminal_risk_penalty = 0.0
+        self._proxy_unused_gas_penalty = 0.0
         self._proxy_stop_penalty = 0.0
 
     # ------------------------------------------------------------------
@@ -143,16 +174,26 @@ class TxOrderingEnv(gym.Env):
         self._t_max = max(tx.arrival_time for tx in self._pool) if self._pool else 1.0
         self._min_arrival = min(tx.arrival_time for tx in self._pool) if self._pool else 0.0
         self._median_arrival = float(np.median([tx.arrival_time for tx in self._pool])) if self._pool else 0.0
+        self._median_fee = float(np.median([tx.fee for tx in self._pool])) if self._pool else 0.0
         self._t_now = self._t_max + 1.0
         self._wait_norm_denom = max(self._t_now - self._min_arrival, 1e-8)
         self._pool_oldest_ids = self._oldest_ids(self._pool, C.FAIR_OLDEST_RATIO)
+        self._pool_late_high_ids = {
+            tx.tid for tx in self._pool
+            if tx.arrival_time > self._median_arrival and tx.fee > self._median_fee
+        }
 
         self._proxy_fee_reward = 0.0
         self._proxy_age_reward = 0.0
         self._proxy_oldest_cover_reward = 0.0
         self._proxy_risk_penalty = 0.0
+        self._proxy_fairness_gate = 1.0
+        self._proxy_packing_reward = 0.0
+        self._proxy_late_fee_recovery = 0.0
         self._proxy_terminal_fair = 0.0
         self._proxy_starvation_penalty = 0.0
+        self._proxy_terminal_risk_penalty = 0.0
+        self._proxy_unused_gas_penalty = 0.0
         self._proxy_stop_penalty = 0.0
 
         return self._obs()
@@ -252,6 +293,13 @@ class TxOrderingEnv(gym.Env):
         unserved = len([tid for tid in self._pool_oldest_ids if tid not in selected_ids])
         return unserved / len(self._pool_oldest_ids)
 
+    def _oldest_coverage_ratio(self) -> float:
+        if not self._pool_oldest_ids:
+            return 0.0
+        selected_ids = {tx.tid for tx in self._selected}
+        served = len([tid for tid in self._pool_oldest_ids if tid in selected_ids])
+        return served / len(self._pool_oldest_ids)
+
     def _oldest_wait_mass_norm(self) -> float:
         if not self._pool_oldest_ids:
             return 0.0
@@ -281,6 +329,78 @@ class TxOrderingEnv(gym.Env):
             return 0.0, 0.0
         return float(max(ratios)), float(np.mean(ratios))
 
+    def _fairness_proxy(self) -> float:
+        if not self._selected:
+            return 0.0
+        waits = np.array([self._wait(tx) for tx in self._selected], dtype=np.float64)
+        return self._jain_index(waits)
+
+    def _fairness_gate(self) -> float:
+        fair = self._fairness_proxy()
+        oldest_cov = self._oldest_coverage_ratio()
+        starvation = self._oldest_unserved_ratio()
+        feasible = (
+            fair >= self.fairness_gate_threshold
+            and oldest_cov >= self.fairness_oldest_coverage_floor
+            and starvation <= self.fairness_starvation_ceil
+        )
+        if self.fairness_gate_type == "hard":
+            return self.fairness_gate_min if feasible else 1.0
+
+        # sigmoid: 达标后逐步收缩公平项权重；未达标时保持接近 1
+        x = self.fairness_gate_sharpness * (fair - self.fairness_gate_threshold)
+        gate = self.fairness_gate_min + (1.0 - self.fairness_gate_min) * (1.0 / (1.0 + math.exp(x)))
+        if not feasible:
+            gate = max(gate, 0.75)
+        return float(min(max(gate, self.fairness_gate_min), 1.0))
+
+    def _risk_exposure_selected(self) -> float:
+        if not self._selected:
+            return 0.0
+        k = len(self._selected)
+        n_edge = max(int(k * C.RISK_POSITION_RATIO), 1)
+        idx = set(range(n_edge)) | set(range(max(k - n_edge, 0), k))
+        sensitive = [self._selected[i] for i in idx]
+        risky_sensitive = sum(1 for tx in sensitive if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD)
+        total_risky = sum(1 for tx in self._selected if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD)
+        if total_risky == 0:
+            return 0.0
+        return risky_sensitive / total_risky
+
+    def _top10_risk_ratio_selected(self) -> float:
+        if not self._selected:
+            return 0.0
+        k = len(self._selected)
+        n_top = max(int(k * 0.1), 1)
+        top = self._selected[:n_top]
+        risky = sum(1 for tx in top if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD)
+        return risky / n_top
+
+    def _avg_risky_rank_selected(self) -> float:
+        if len(self._selected) <= 1:
+            return 0.5
+        pos = [
+            i / (len(self._selected) - 1)
+            for i, tx in enumerate(self._selected)
+            if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD
+        ]
+        if not pos:
+            return 0.5
+        return float(np.mean(pos))
+
+    def _remaining_fee_mass_norm(self) -> float:
+        selected_ids = {tx.tid for tx in self._selected}
+        rem_fee = sum(tx.fee for tx in self._pool if tx.tid not in selected_ids)
+        total_fee = sum(tx.fee for tx in self._pool)
+        return rem_fee / max(total_fee, 1e-8)
+
+    def _late_high_fee_unserved_ratio(self) -> float:
+        if not self._pool_late_high_ids:
+            return 0.0
+        selected_ids = {tx.tid for tx in self._selected}
+        unserved = len([tid for tid in self._pool_late_high_ids if tid not in selected_ids])
+        return unserved / len(self._pool_late_high_ids)
+
     def _risk_position_penalty(self, pos_ratio: float) -> float:
         """越接近两端惩罚越大，中心位置惩罚越小。"""
         dist = abs(pos_ratio - C.RISK_CENTER)
@@ -303,17 +423,37 @@ class TxOrderingEnv(gym.Env):
         est_block_size = max(int(C.MAX_BLOCK_GAS / avg_gas), 1) if avg_gas > 0 else len(self._pool)
         pos_ratio = self._step_count / max(est_block_size - 1, 1)
         r_risk = tx.risk_score * self._risk_position_penalty(pos_ratio)
+        fairness_gate = self._fairness_gate()
+
+        # packing 激励（弱项，避免主导训练）
+        r_packing = tx.gas / C.MAX_BLOCK_GAS
+
+        # late-high-fee recovery（仅作弱激励，并按风险折减）
+        is_late_high = (tx.arrival_time > self._median_arrival) and (tx.fee > self._median_fee)
+        r_late_fee = (1.0 - tx.risk_score) if is_late_high else 0.0
 
         fee_contrib = self.alpha * r_fee
-        age_contrib = self.beta_age * r_age
-        oldest_contrib = self.beta_oldest_cover * r_oldest_cover
+        age_contrib = fairness_gate * self.beta_age * r_age
+        oldest_contrib = fairness_gate * self.beta_oldest_cover * r_oldest_cover
         risk_contrib = -self.gamma_r * r_risk
+        packing_contrib = self.packing_reward_weight * r_packing
+        late_fee_contrib = self.late_fee_recovery_weight * r_late_fee
 
         self._proxy_fee_reward += fee_contrib
         self._proxy_age_reward += age_contrib
         self._proxy_oldest_cover_reward += oldest_contrib
         self._proxy_risk_penalty += risk_contrib
-        return fee_contrib + age_contrib + oldest_contrib + risk_contrib
+        self._proxy_fairness_gate = fairness_gate
+        self._proxy_packing_reward += packing_contrib
+        self._proxy_late_fee_recovery += late_fee_contrib
+        return (
+            fee_contrib
+            + age_contrib
+            + oldest_contrib
+            + risk_contrib
+            + packing_contrib
+            + late_fee_contrib
+        )
 
     def _compute_stop_penalty(self, valid_indices: set[int]) -> float:
         if not self._pool:
@@ -328,13 +468,21 @@ class TxOrderingEnv(gym.Env):
         oldest_wait_mass = self._oldest_wait_mass_norm()
         packing_ratio = len(self._selected) / max(len(self._pool), 1)
         packing_gap = 1.0 - packing_ratio
+        unused_gas_ratio = self._remaining_gas / C.MAX_BLOCK_GAS
+        late_high_unserved = self._late_high_fee_unserved_ratio()
+        remaining_fee_mass_norm = self._remaining_fee_mass_norm()
 
         penalty_strength = (
-            C.STOP_FEE_WEIGHT * avg_remaining_fee_norm
+            C.STOP_FEE_WEIGHT * (0.5 * avg_remaining_fee_norm + 0.5 * remaining_fee_mass_norm)
             + C.STOP_OLDEST_UNSERVED_WEIGHT * oldest_unserved
             + C.STOP_OLDEST_WAIT_WEIGHT * oldest_wait_mass
             + C.STOP_PACKING_WEIGHT * packing_gap
+            + C.STOP_UNUSED_GAS_WEIGHT * unused_gas_ratio
+            + C.STOP_LATE_HIGH_FEE_UNSERVED_WEIGHT * late_high_unserved
         )
+        if self._fairness_gate() <= (self.fairness_gate_min + 0.05):
+            # fairness 已达标后，进一步抑制“早停躺平”
+            penalty_strength *= 1.15
         return -self.eta * penalty_strength
 
     def _apply_terminal_reward(self) -> float:
@@ -348,12 +496,32 @@ class TxOrderingEnv(gym.Env):
         else:
             terminal_fair = 0.0
         starvation = self._oldest_unserved_ratio()
+        fairness_gate = self._fairness_gate()
 
-        terminal_fair_contrib = self.beta_terminal_fair * terminal_fair
-        starvation_penalty = -self.gamma_starvation * starvation
+        terminal_fair_contrib = fairness_gate * self.beta_terminal_fair * terminal_fair
+        starvation_penalty = -fairness_gate * self.gamma_starvation * starvation
+
+        terminal_risk_exposure = self._risk_exposure_selected()
+        terminal_top10_risk = self._top10_risk_ratio_selected()
+        terminal_risky_rank_dev = abs(self._avg_risky_rank_selected() - 0.5)
+        terminal_risk_penalty = -(
+            self.terminal_risk_exposure_weight * terminal_risk_exposure
+            + self.terminal_top10_risk_weight * terminal_top10_risk
+            + self.terminal_risky_rank_dev_weight * terminal_risky_rank_dev
+        )
+        unused_gas_penalty = -self.unused_gas_penalty_weight * (self._remaining_gas / C.MAX_BLOCK_GAS)
+
         self._proxy_terminal_fair += terminal_fair_contrib
         self._proxy_starvation_penalty += starvation_penalty
-        return terminal_fair_contrib + starvation_penalty
+        self._proxy_terminal_risk_penalty += terminal_risk_penalty
+        self._proxy_unused_gas_penalty += unused_gas_penalty
+        self._proxy_fairness_gate = fairness_gate
+        return (
+            terminal_fair_contrib
+            + starvation_penalty
+            + terminal_risk_penalty
+            + unused_gas_penalty
+        )
 
     def _fairness_block_summary(self) -> np.ndarray:
         # backlog wait 特征
@@ -408,6 +576,31 @@ class TxOrderingEnv(gym.Env):
             sender_starvation_mean,
         ], dtype=np.float32)
 
+    def _risk_block_summary(self) -> np.ndarray:
+        selected_top10_risk_ratio = self._top10_risk_ratio_selected()
+        risk_exposure_selected = self._risk_exposure_selected()
+        selected_risky_rank_mean = self._avg_risky_rank_selected()
+
+        if self._candidates:
+            oldest_candidates = self._oldest_ids(self._candidates, C.FAIR_OLDEST_RATIO)
+            overlap = [
+                tx for tx in self._candidates
+                if tx.tid in oldest_candidates and tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD
+            ]
+            remaining_risky_oldest_overlap_ratio = len(overlap) / max(len(oldest_candidates), 1)
+        else:
+            remaining_risky_oldest_overlap_ratio = 0.0
+
+        late_high_fee_unserved_ratio = self._late_high_fee_unserved_ratio()
+
+        return np.array([
+            selected_top10_risk_ratio,
+            risk_exposure_selected,
+            selected_risky_rank_mean,
+            remaining_risky_oldest_overlap_ratio,
+            late_high_fee_unserved_ratio,
+        ], dtype=np.float32)
+
     def _obs(self) -> dict:
         """构造 padded 观测。"""
         n = len(self._candidates)
@@ -421,6 +614,7 @@ class TxOrderingEnv(gym.Env):
         acc_fee_norm = self._acc_fee / (self._max_fee * max(len(self._pool), 1))
 
         fairness_summary = self._fairness_block_summary()
+        risk_summary = self._risk_block_summary()
 
         # 已选交易序列摘要 (均值池化)
         if self._selected and not self.no_seq_summary:
@@ -437,6 +631,7 @@ class TxOrderingEnv(gym.Env):
         block_state = np.concatenate([
             np.array([rem_gas_norm, n_sel_norm, acc_fee_norm], dtype=np.float32),
             fairness_summary,
+            risk_summary,
             seq_summary,
         ])
 
@@ -477,13 +672,22 @@ class TxOrderingEnv(gym.Env):
                 "age_reward": self._proxy_age_reward,
                 "oldest_cover_reward": self._proxy_oldest_cover_reward,
                 "risk_penalty": self._proxy_risk_penalty,
+                "packing_reward": self._proxy_packing_reward,
+                "late_fee_recovery_reward": self._proxy_late_fee_recovery,
                 "terminal_fair_reward": self._proxy_terminal_fair,
                 "starvation_penalty": self._proxy_starvation_penalty,
+                "terminal_risk_penalty": self._proxy_terminal_risk_penalty,
+                "unused_gas_penalty": self._proxy_unused_gas_penalty,
+                "fairness_gate": self._proxy_fairness_gate,
                 "stop_penalty": self._proxy_stop_penalty,
             },
             "proxy_age_reward": self._proxy_age_reward,
             "proxy_oldest_cover": self._proxy_oldest_cover_reward,
             "proxy_starvation_penalty": self._proxy_starvation_penalty,
+            "proxy_terminal_risk_penalty": self._proxy_terminal_risk_penalty,
+            "proxy_packing_reward": self._proxy_packing_reward,
+            "proxy_unused_gas_penalty": self._proxy_unused_gas_penalty,
+            "proxy_fairness_gate": self._proxy_fairness_gate,
         }
 
     # ------------------------------------------------------------------

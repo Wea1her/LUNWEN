@@ -25,10 +25,12 @@ from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
                       build_fairness_decomposition,
                       plot_training_curve)
 from baselines import run_baseline
-from metrics import compute_all_metrics
+from metrics import (compute_all_metrics, constrained_success_score,
+                     pareto_dominates)
 from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, generate_composite_table,
-                          generate_fairness_decomp_table, ABLATION_ORDER,
+                          generate_fairness_decomp_table, generate_constrained_main_table,
+                          generate_pareto_main_table, ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS)
 from method_registry import MAIN_METHOD_ORDER, get_baseline_method_ids, normalize_method_id
@@ -414,7 +416,14 @@ def run_single_seed(seed, args_dict):
             val_interval=args.val_interval,
             val_metric=args.val_metric,
             val_fairness_floor=args.val_fairness_floor,
+            val_oldest_coverage_floor=args.val_oldest_coverage_floor,
             val_risk_ceil=args.val_risk_ceil,
+            val_top10_risk_ceil=args.val_top10_risk_ceil,
+            pretrain_policy=args.pretrain_policy,
+            pretrain_epochs=args.pretrain_epochs,
+            pretrain_episodes_per_epoch=args.pretrain_episodes_per_epoch,
+            curriculum=args.curriculum,
+            curriculum_stage_episodes=args.curriculum_stage_episodes,
         )
         t0 = time.perf_counter()
         train_model(train_args)
@@ -507,6 +516,8 @@ def aggregate_metric_grid(all_results):
         "tail_wait_reduction",
         "selected_wait_std",
         "composite_score",
+        "constrained_fee_score",
+        "risk_adjusted_fee_score",
     ]
 
     agg = {}
@@ -551,6 +562,8 @@ def aggregate_across_seeds(all_main=None, all_rob_risk=None, all_rob_pool=None, 
         "tail_wait_reduction",
         "selected_wait_std",
         "composite_score",
+        "constrained_fee_score",
+        "risk_adjusted_fee_score",
     ]
 
     agg_main = {}
@@ -656,7 +669,14 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs, shared_pool_path=N
             val_interval=args.val_interval,
             val_metric=args.val_metric,
             val_fairness_floor=args.val_fairness_floor,
+            val_oldest_coverage_floor=args.val_oldest_coverage_floor,
             val_risk_ceil=args.val_risk_ceil,
+            val_top10_risk_ceil=args.val_top10_risk_ceil,
+            pretrain_policy=args.pretrain_policy,
+            pretrain_epochs=args.pretrain_epochs,
+            pretrain_episodes_per_epoch=args.pretrain_episodes_per_epoch,
+            curriculum=args.curriculum,
+            curriculum_stage_episodes=args.curriculum_stage_episodes,
         )
         train_model(train_args, env_kwargs=env_kwargs)
         print(f"  [Ablation] {name} seed={seed} 训练完成", flush=True)
@@ -761,6 +781,25 @@ def _resolve_stages(args):
     if not stages:
         stages.add("main")
     args.stages = [stage for stage in STAGE_ORDER if stage in stages]
+
+
+def _apply_track_defaults(args):
+    if args.track == "fairness_recovery_track":
+        if args.val_metric == C.VALIDATION_METRIC:
+            args.val_metric = "constrained_fee"
+        args.val_fairness_floor = max(args.val_fairness_floor, 0.92)
+        args.val_oldest_coverage_floor = max(args.val_oldest_coverage_floor, 0.95)
+        args.val_risk_ceil = min(args.val_risk_ceil, 0.35)
+        args.val_top10_risk_ceil = min(args.val_top10_risk_ceil, 0.35)
+        return
+
+    if args.track == "composite_optimal_track":
+        if args.val_metric == C.VALIDATION_METRIC:
+            args.val_metric = "hypervolume"
+        args.val_fairness_floor = max(args.val_fairness_floor, 0.90)
+        args.val_oldest_coverage_floor = max(args.val_oldest_coverage_floor, 0.90)
+        args.val_risk_ceil = min(args.val_risk_ceil, 0.30)
+        args.val_top10_risk_ceil = min(args.val_top10_risk_ceil, 0.30)
 
 
 def _collect_git_commit() -> str | None:
@@ -993,6 +1032,117 @@ def _build_fairness_decomposition_from_rows(main_episode_rows: list[dict], basel
     return payload
 
 
+def _build_constrained_eval_summary_from_rows(
+    main_episode_rows: list[dict],
+    baseline_methods: list[str],
+    args: argparse.Namespace,
+) -> dict:
+    constraints = {
+        "fairness_floor": args.val_fairness_floor,
+        "oldest_coverage_floor": args.val_oldest_coverage_floor,
+        "risk_ceil": args.val_risk_ceil,
+        "top10_risk_ceil": args.val_top10_risk_ceil,
+    }
+    payload = {"constraints": constraints, "methods": {}}
+    for method_id in ["ours", *baseline_methods]:
+        vals = []
+        for row in main_episode_rows:
+            if row.get("setting", "main") != "main" or row.get("method") != method_id:
+                continue
+            metrics = row.get("metrics", {})
+            vals.append(
+                constrained_success_score(
+                    metrics,
+                    constraints=constraints,
+                    target_metric="block_fee_norm",
+                )
+            )
+        feasible = [v for v in vals if v > -1.0 + 1e-12]
+        payload["methods"][method_id] = {
+            "feasible_rate": (len(feasible) / len(vals)) if vals else 0.0,
+            "constrained_fee_mean": float(np.mean(feasible)) if feasible else -1.0,
+            "constrained_fee_std": float(np.std(feasible)) if feasible else 0.0,
+            "infeasible_count": len(vals) - len(feasible),
+            "n_episodes": len(vals),
+        }
+    ranked = sorted(
+        payload["methods"].items(),
+        key=lambda kv: (kv[1]["feasible_rate"], kv[1]["constrained_fee_mean"]),
+        reverse=True,
+    )
+    payload["ranking"] = [name for name, _ in ranked]
+    return payload
+
+
+def _build_pareto_outputs_from_rows(main_episode_rows: list[dict], baseline_methods: list[str]) -> tuple[dict, dict]:
+    objectives = ["block_fee", "fairness", "risk_exposure", "oldest_coverage"]
+    lower_is_better = {"risk_exposure"}
+    methods = ["ours", *baseline_methods]
+    pair_map: dict[tuple, dict[str, dict]] = {}
+    for row in main_episode_rows:
+        if row.get("setting", "main") != "main":
+            continue
+        method = row.get("method")
+        if method not in methods:
+            continue
+        key = (row.get("seed"), row.get("shared_pool_id", row.get("episode_id")))
+        pair_map.setdefault(key, {})[method] = row.get("metrics", {})
+
+    matrix = {m: {} for m in methods}
+    for a in methods:
+        for b in methods:
+            if a == b:
+                matrix[a][b] = {
+                    "ours_dominates_rate": 0.0,
+                    "baseline_dominates_rate": 0.0,
+                    "non_dominated_rate": 1.0,
+                    "n_pairs": len(pair_map),
+                }
+                continue
+            ours_dom = 0
+            base_dom = 0
+            n = 0
+            for items in pair_map.values():
+                if a not in items or b not in items:
+                    continue
+                n += 1
+                if pareto_dominates(items[a], items[b], objectives, lower_is_better):
+                    ours_dom += 1
+                elif pareto_dominates(items[b], items[a], objectives, lower_is_better):
+                    base_dom += 1
+            non_dom = n - ours_dom - base_dom
+            matrix[a][b] = {
+                "ours_dominates_rate": (ours_dom / n) if n else 0.0,
+                "baseline_dominates_rate": (base_dom / n) if n else 0.0,
+                "non_dominated_rate": (non_dom / n) if n else 0.0,
+                "n_pairs": n,
+            }
+
+    pareto_episode = {
+        "objectives": objectives,
+        "lower_is_better": list(lower_is_better),
+        "episodes": [],
+    }
+    for (seed, pool_id), items in sorted(pair_map.items(), key=lambda kv: kv[0]):
+        dom = {}
+        for a in methods:
+            if a not in items:
+                continue
+            dom[a] = {}
+            for b in methods:
+                if b not in items or a == b:
+                    dom[a][b] = False
+                    continue
+                dom[a][b] = pareto_dominates(items[a], items[b], objectives, lower_is_better)
+        pareto_episode["episodes"].append({
+            "seed": seed,
+            "shared_pool_id": pool_id,
+            "methods": items,
+            "dominance": dom,
+        })
+    return pareto_episode, matrix
+
+
 def _merge_case_studies(case_study_seed_paths: list[str]) -> dict:
     seeds_payload = []
     for path in case_study_seed_paths:
@@ -1035,13 +1185,25 @@ def main():
                         help="当 checkpoint 缺失时允许随机策略回退")
     parser.add_argument("--enable-center-aware-baseline", action="store_true",
                         help="启用更强启发式基线 Center-Aware Greedy")
+    parser.add_argument("--track", type=str, default="composite_optimal_track",
+                        choices=["fairness_recovery_track", "composite_optimal_track"],
+                        help="正式协议轨道：fairness_recovery_track 或 composite_optimal_track")
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
     parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
+    parser.add_argument("--val-oldest-coverage-floor", type=float, default=C.VALIDATION_OLDEST_COVERAGE_FLOOR)
     parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
+    parser.add_argument("--val-top10-risk-ceil", type=float, default=C.VALIDATION_TOP10_RISK_CEIL)
+    parser.add_argument("--pretrain-policy", type=str, default=C.PRETRAIN_POLICY,
+                        choices=["none", "fifo", "fair_fee", "mixed"])
+    parser.add_argument("--pretrain-epochs", type=int, default=C.PRETRAIN_EPOCHS)
+    parser.add_argument("--pretrain-episodes-per-epoch", type=int, default=C.PRETRAIN_EPISODES_PER_EPOCH)
+    parser.add_argument("--curriculum", action="store_true", default=C.CURRICULUM_ENABLED)
+    parser.add_argument("--curriculum-stage-episodes", type=float, nargs=3, default=C.CURRICULUM_STAGE_EPISODES)
     args = parser.parse_args()
     _resolve_stages(args)
+    _apply_track_defaults(args)
     args.device_map = _parse_device_map(args.device_map)
     args.baseline_methods = get_baseline_method_ids(args.enable_center_aware_baseline)
 
@@ -1068,6 +1230,13 @@ def main():
     print(f"Episodes: {args.episodes}")
     print(f"Pool size: {args.pool_size}")
     print(f"Baselines: {args.baseline_methods}")
+    print(f"Track: {args.track}")
+    print(
+        "Validation protocol: "
+        f"metric={args.val_metric}, fairness>={args.val_fairness_floor}, "
+        f"oldest_cov>={args.val_oldest_coverage_floor}, risk<={args.val_risk_ceil}, "
+        f"top10_risk<={args.val_top10_risk_ceil}"
+    )
     if args.device_map:
         print(f"Device map: {args.device_map}")
 
@@ -1083,6 +1252,7 @@ def main():
     run_summary = {
         "timestamp": datetime.now().isoformat(),
         "stages": args.stages,
+        "track": args.track,
         "allow_random_fallback": args.allow_random_fallback,
         "resume": args.resume,
         "skip_existing": args.skip_existing,
@@ -1090,6 +1260,13 @@ def main():
         "device": str(device),
         "device_map": {str(k): v for k, v in args.device_map.items()},
         "baseline_methods": args.baseline_methods,
+        "validation_protocol": {
+            "metric": args.val_metric,
+            "fairness_floor": args.val_fairness_floor,
+            "oldest_coverage_floor": args.val_oldest_coverage_floor,
+            "risk_ceil": args.val_risk_ceil,
+            "top10_risk_ceil": args.val_top10_risk_ceil,
+        },
         "config_snapshot": os.path.basename(config_snapshot_path),
         "seeds": args.seeds,
         "seed_runs": [],
@@ -1286,6 +1463,36 @@ def main():
             with open(fairness_tex_path, "w") as f:
                 f.write(fairness_tex)
             run_summary["outputs"]["table_fairness_decomp"] = os.path.basename(fairness_tex_path)
+
+            constrained_summary = _build_constrained_eval_summary_from_rows(
+                main_episode_rows,
+                args.baseline_methods,
+                args,
+            )
+            constrained_path = os.path.join(args.output, "constrained_eval_summary.json")
+            _write_json(constrained_path, constrained_summary)
+            run_summary["outputs"]["constrained_eval_summary"] = os.path.basename(constrained_path)
+            constrained_tex = generate_constrained_main_table(constrained_summary)
+            constrained_tex_path = os.path.join(args.output, "table_constrained_main.tex")
+            with open(constrained_tex_path, "w") as f:
+                f.write(constrained_tex)
+            run_summary["outputs"]["table_constrained_main"] = os.path.basename(constrained_tex_path)
+
+            pareto_episode, dominance_matrix = _build_pareto_outputs_from_rows(
+                main_episode_rows,
+                args.baseline_methods,
+            )
+            pareto_path = os.path.join(args.output, "pareto_episode_analysis.json")
+            matrix_path = os.path.join(args.output, "dominance_matrix.json")
+            _write_json(pareto_path, pareto_episode)
+            _write_json(matrix_path, dominance_matrix)
+            run_summary["outputs"]["pareto_episode_analysis"] = os.path.basename(pareto_path)
+            run_summary["outputs"]["dominance_matrix"] = os.path.basename(matrix_path)
+            pareto_tex = generate_pareto_main_table(dominance_matrix, anchor_method="ours")
+            pareto_tex_path = os.path.join(args.output, "table_pareto_main.tex")
+            with open(pareto_tex_path, "w") as f:
+                f.write(pareto_tex)
+            run_summary["outputs"]["table_pareto_main"] = os.path.basename(pareto_tex_path)
 
         merged_case_study = _merge_case_studies(case_study_seed_paths)
         if merged_case_study["seed_case_studies"]:

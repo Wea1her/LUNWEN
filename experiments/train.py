@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import json
+import random
 import torch
 import numpy as np
 
@@ -35,8 +36,15 @@ def _run_validation(model: ActorCritic,
     if args.val_metric == "constrained_fee":
         fee = float(agg.get("block_fee_mean", 0.0))
         fairness = float(agg.get("fairness_mean", 0.0))
+        oldest_cov = float(agg.get("oldest_coverage_mean", 0.0))
         risk = float(agg.get("risk_exposure_mean", 1.0))
-        feasible = (fairness >= args.val_fairness_floor) and (risk <= args.val_risk_ceil)
+        top10_risk = float(agg.get("top10_risk_mean", 1.0))
+        feasible = (
+            fairness >= getattr(args, "val_fairness_floor", C.VALIDATION_FAIRNESS_FLOOR)
+            and oldest_cov >= getattr(args, "val_oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR)
+            and risk <= getattr(args, "val_risk_ceil", C.VALIDATION_RISK_CEIL)
+            and top10_risk <= getattr(args, "val_top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL)
+        )
         metric_key = "block_fee_mean"
         metric_value = fee
         score = fee if feasible else -float("inf")
@@ -62,25 +70,201 @@ def _run_validation(model: ActorCritic,
     }
 
 
+def _teacher_action_from_env(env: TxOrderingEnv, policy: str) -> int:
+    valid = sorted(env._valid_indices())  # noqa: SLF001
+    if not valid:
+        return len(env._candidates)  # noqa: SLF001
+
+    candidates = env._candidates  # noqa: SLF001
+    if policy == "fifo":
+        return min(valid, key=lambda i: candidates[i].arrival_time)
+    if policy == "fair_fee":
+        t_now = env._t_now  # noqa: SLF001
+        max_fee = max(env._max_fee, 1e-8)  # noqa: SLF001
+        t_max = max(env._t_max, 1e-8)  # noqa: SLF001
+        return max(
+            valid,
+            key=lambda i: (candidates[i].fee / max_fee) + ((t_now - candidates[i].arrival_time) / t_max),
+        )
+    if policy == "gas":
+        return max(valid, key=lambda i: candidates[i].fee)
+
+    # mixed teacher
+    sampled = random.choice(["fifo", "fair_fee", "gas"])
+    return _teacher_action_from_env(env, sampled)
+
+
+def _behavior_clone_warmstart(
+    model: ActorCritic,
+    device: torch.device,
+    env: TxOrderingEnv,
+    policy: str,
+    epochs: int,
+    episodes_per_epoch: int,
+) -> list[dict]:
+    if policy == "none" or epochs <= 0:
+        return []
+
+    optimizer = torch.optim.Adam(
+        [
+            {"params": model.encoder.parameters(), "lr": C.LR_ACTOR},
+            {"params": model.actor_fc.parameters(), "lr": C.LR_ACTOR},
+            {"params": model.actor_score.parameters(), "lr": C.LR_ACTOR},
+            {"params": [model.stop_embed], "lr": C.LR_ACTOR},
+        ]
+    )
+    history = []
+    model.train()
+    for epoch in range(1, epochs + 1):
+        losses = []
+        n_steps = 0
+        for _ in range(max(episodes_per_epoch, 1)):
+            obs, _ = env.reset()
+            while True:
+                action = _teacher_action_from_env(env, policy)
+                tx_f = torch.as_tensor(obs["tx_features"], dtype=torch.float32, device=device)
+                bs = torch.as_tensor(obs["block_state"], dtype=torch.float32, device=device)
+                mask = torch.as_tensor(obs["action_mask"], dtype=torch.float32, device=device)
+                n = int(obs["num_candidates"])
+                log_probs, _ = model.forward(tx_f, bs, mask, n)
+                losses.append(-log_probs[action])
+                n_steps += 1
+                obs, _, done, _, _ = env.step(action)
+                if done:
+                    break
+
+        if losses:
+            loss = torch.stack(losses).mean()
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            optimizer.step()
+            history.append({
+                "epoch": epoch,
+                "policy": policy,
+                "bc_loss": float(loss.item()),
+                "steps": n_steps,
+            })
+    return history
+
+
+def _resolve_curriculum_stage(ep: int, total_episodes: int, cuts: tuple[float, float, float]) -> int:
+    c1 = max(int(total_episodes * cuts[0]), 1)
+    c2 = max(int(total_episodes * cuts[1]), c1 + 1)
+    if ep <= c1:
+        return 1
+    if ep <= c2:
+        return 2
+    return 3
+
+
+def _curriculum_env_kwargs(base_env_kwargs: dict, args: argparse.Namespace, stage: int) -> dict:
+    if not args.curriculum:
+        return dict(base_env_kwargs)
+
+    kwargs = dict(base_env_kwargs)
+    if stage == 1:
+        kwargs["beta_age"] = kwargs.get("beta_age", C.BETA_AGE) * 1.35
+        kwargs["beta_oldest_cover"] = kwargs.get("beta_oldest_cover", C.BETA_OLDEST_COVER) * 1.35
+        kwargs["gamma_r"] = kwargs.get("gamma_r", C.GAMMA_R) * 0.7
+        kwargs["terminal_risk_exposure_weight"] = kwargs.get(
+            "terminal_risk_exposure_weight",
+            C.TERMINAL_RISK_EXPOSURE_WEIGHT,
+        ) * 0.6
+        kwargs["terminal_top10_risk_weight"] = kwargs.get(
+            "terminal_top10_risk_weight",
+            C.TERMINAL_TOP10_RISK_WEIGHT,
+        ) * 0.6
+        kwargs["fairness_gate_min"] = max(kwargs.get("fairness_gate_min", C.FAIRNESS_GATE_MIN), 0.55)
+    elif stage == 2:
+        kwargs["gamma_r"] = kwargs.get("gamma_r", C.GAMMA_R) * 1.15
+        kwargs["terminal_risk_exposure_weight"] = kwargs.get(
+            "terminal_risk_exposure_weight",
+            C.TERMINAL_RISK_EXPOSURE_WEIGHT,
+        ) * 1.2
+        kwargs["terminal_top10_risk_weight"] = kwargs.get(
+            "terminal_top10_risk_weight",
+            C.TERMINAL_TOP10_RISK_WEIGHT,
+        ) * 1.2
+        kwargs["fairness_gate_min"] = max(kwargs.get("fairness_gate_min", C.FAIRNESS_GATE_MIN), 0.45)
+    return kwargs
+
+
+def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
+    fairness = float(agg.get("fairness_mean", 0.0))
+    oldest = float(agg.get("oldest_coverage_mean", 0.0))
+    starvation = float(agg.get("starvation_gap_mean", 1.0))
+    risk = float(agg.get("risk_exposure_mean", 1.0))
+    top10 = float(agg.get("top10_risk_mean", 1.0))
+    fee_norm = float(agg.get("block_fee_norm_mean", 0.0))
+    constrained_fee = (
+        fee_norm
+        if (
+            fairness >= getattr(args, "val_fairness_floor", C.VALIDATION_FAIRNESS_FLOOR)
+            and oldest >= getattr(args, "val_oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR)
+            and risk <= getattr(args, "val_risk_ceil", C.VALIDATION_RISK_CEIL)
+            and top10 <= getattr(args, "val_top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL)
+        )
+        else -float("inf")
+    )
+    return {
+        "fairness_recovery": fairness + 0.4 * oldest - 0.2 * starvation,
+        "risk_aligned": fairness - 0.8 * risk - 0.3 * top10,
+        "constrained_fee": constrained_fee,
+        "hypervolume": fee_norm * max(fairness, 0.0) * max(1.0 - risk, 0.0) * max(oldest, 1e-6),
+    }
+
+
 def train(args, env_kwargs: dict | None = None):
-    env_kwargs = env_kwargs or {}
+    base_env_kwargs = dict(env_kwargs or {})
     device = resolve_device(args.device)
     if device.type == "cuda":
         print(f"Device: {device} ({torch.cuda.get_device_name(device)})")
     else:
         print(f"Device: {device}")
 
-    env = TxOrderingEnv(pool_size=args.pool_size,
-                        risk_ratio=args.risk_ratio,
-                        seed=args.seed,
-                        **env_kwargs)
+    curriculum_enabled = bool(getattr(args, "curriculum", C.CURRICULUM_ENABLED))
+    curriculum_cuts = tuple(getattr(args, "curriculum_stage_episodes", C.CURRICULUM_STAGE_EPISODES))
+    pretrain_policy = getattr(args, "pretrain_policy", C.PRETRAIN_POLICY)
+    pretrain_epochs = int(getattr(args, "pretrain_epochs", C.PRETRAIN_EPOCHS))
+    pretrain_episodes_per_epoch = int(
+        getattr(args, "pretrain_episodes_per_epoch", C.PRETRAIN_EPISODES_PER_EPOCH)
+    )
+
+    if curriculum_enabled:
+        current_stage = _resolve_curriculum_stage(
+            ep=1,
+            total_episodes=args.episodes,
+            cuts=curriculum_cuts,
+        )
+    else:
+        current_stage = 3
+    args.curriculum = curriculum_enabled
+    args.curriculum_stage_episodes = curriculum_cuts
+    active_env_kwargs = _curriculum_env_kwargs(base_env_kwargs, args, current_stage)
+    env = TxOrderingEnv(
+        pool_size=args.pool_size,
+        risk_ratio=args.risk_ratio,
+        seed=args.seed,
+        **active_env_kwargs,
+    )
 
     model = ActorCritic().to(device)
     trainer = PPOTrainer(model, device=device)
     buffer = RolloutBuffer()
 
+    warmstart_history = _behavior_clone_warmstart(
+        model=model,
+        device=device,
+        env=env,
+        policy=pretrain_policy,
+        epochs=pretrain_epochs,
+        episodes_per_epoch=pretrain_episodes_per_epoch,
+    )
+
     log = {
         "episode": [],
+        "stage": [],
         "reward": [],
         "fee": [],
         "steps": [],
@@ -94,9 +278,15 @@ def train(args, env_kwargs: dict | None = None):
         "proxy_oldest_cover": [],
         "proxy_terminal_fair_reward": [],
         "proxy_starvation_penalty": [],
+        "proxy_terminal_risk_penalty": [],
+        "proxy_packing_reward": [],
+        "proxy_unused_gas_penalty": [],
+        "proxy_fairness_gate": [],
         "val_episode": [],
         "val_metric": [],
         "val_score": [],
+        "warmstart": warmstart_history,
+        "stage_switches": [],
     }
 
     validation_seed = args.seed + C.VALIDATION_SEED_OFFSET
@@ -111,15 +301,41 @@ def train(args, env_kwargs: dict | None = None):
         "risk_ratio": args.risk_ratio,
         "validation_metric": args.val_metric,
         "higher_is_better": _higher_is_better(args.val_metric),
-        "env_kwargs": env_kwargs,
+        "env_kwargs": base_env_kwargs,
+        "curriculum": curriculum_enabled,
+        "validation_fairness_floor": args.val_fairness_floor,
+        "validation_oldest_coverage_floor": args.val_oldest_coverage_floor,
+        "validation_risk_ceil": args.val_risk_ceil,
+        "validation_top10_risk_ceil": args.val_top10_risk_ceil,
     })
 
     best_score = -float("inf")
     best_episode = None
     best_metric_value = None
     best_metric_key = None
+    multi_best = {
+        "fairness_recovery": {"score": -float("inf"), "episode": None, "file": "best_fairness_recovery.pt"},
+        "risk_aligned": {"score": -float("inf"), "episode": None, "file": "best_risk_aligned.pt"},
+        "constrained_fee": {"score": -float("inf"), "episode": None, "file": "best_constrained_fee.pt"},
+        "hypervolume": {"score": -float("inf"), "episode": None, "file": "best_hypervolume.pt"},
+    }
 
     for ep in range(1, args.episodes + 1):
+        if curriculum_enabled:
+            stage = _resolve_curriculum_stage(ep, args.episodes, curriculum_cuts)
+        else:
+            stage = 3
+        if stage != current_stage:
+            current_stage = stage
+            active_env_kwargs = _curriculum_env_kwargs(base_env_kwargs, args, current_stage)
+            env = TxOrderingEnv(
+                pool_size=args.pool_size,
+                risk_ratio=args.risk_ratio,
+                seed=args.seed,
+                **active_env_kwargs,
+            )
+            log["stage_switches"].append({"episode": ep, "stage": current_stage})
+
         obs, _ = env.reset()
         ep_reward = 0.0
 
@@ -145,6 +361,7 @@ def train(args, env_kwargs: dict | None = None):
 
         # 记录
         log["episode"].append(ep)
+        log["stage"].append(current_stage)
         log["reward"].append(ep_reward)
         log["fee"].append(info.get("total_fee", 0))
         log["steps"].append(info.get("num_selected", 0))
@@ -161,6 +378,10 @@ def train(args, env_kwargs: dict | None = None):
             reward_decomp.get("terminal_fair_reward", 0.0)
         )
         log["proxy_starvation_penalty"].append(info.get("proxy_starvation_penalty", 0.0))
+        log["proxy_terminal_risk_penalty"].append(info.get("proxy_terminal_risk_penalty", 0.0))
+        log["proxy_packing_reward"].append(info.get("proxy_packing_reward", 0.0))
+        log["proxy_unused_gas_penalty"].append(info.get("proxy_unused_gas_penalty", 0.0))
+        log["proxy_fairness_gate"].append(info.get("proxy_fairness_gate", 1.0))
 
         if ep % args.log_interval == 0:
             recent = log["reward"][-args.log_interval:]
@@ -175,7 +396,7 @@ def train(args, env_kwargs: dict | None = None):
 
         if ep % args.val_interval == 0 or ep == args.episodes:
             model.eval()
-            val = _run_validation(model, device, args, validation_pools, env_kwargs)
+            val = _run_validation(model, device, args, validation_pools, base_env_kwargs)
             model.train()
             log["val_episode"].append(ep)
             log["val_metric"].append(val["metric_value"])
@@ -187,6 +408,17 @@ def train(args, env_kwargs: dict | None = None):
                 best_metric_key = val["metric_key"]
                 torch.save(model.state_dict(),
                            os.path.join(args.output, C.BEST_CHECKPOINT_NAME))
+
+            extra_scores = _multi_checkpoint_scores(val["aggregate"], args)
+            for ckpt_name, payload in multi_best.items():
+                candidate = float(extra_scores.get(ckpt_name, -float("inf")))
+                if candidate > payload["score"]:
+                    payload["score"] = candidate
+                    payload["episode"] = ep
+                    torch.save(
+                        model.state_dict(),
+                        os.path.join(args.output, payload["file"]),
+                    )
 
     # 保存最终模型和训练日志
     torch.save(model.state_dict(),
@@ -208,11 +440,32 @@ def train(args, env_kwargs: dict | None = None):
                 "validation_seed": validation_seed,
                 "validation_pool_file": os.path.basename(validation_pool_path),
                 "validation_fairness_floor": args.val_fairness_floor,
+                "validation_oldest_coverage_floor": args.val_oldest_coverage_floor,
                 "validation_risk_ceil": args.val_risk_ceil,
+                "validation_top10_risk_ceil": args.val_top10_risk_ceil,
                 "best_episode": best_episode,
                 "best_metric_key": best_metric_key,
                 "best_metric_value": best_metric_value,
                 "best_selection_score": best_score,
+            },
+            "warmstart": {
+                "policy": pretrain_policy,
+                "epochs": pretrain_epochs,
+                "episodes_per_epoch": pretrain_episodes_per_epoch,
+                "history": warmstart_history,
+            },
+            "curriculum": {
+                "enabled": curriculum_enabled,
+                "stage_episode_cuts": list(curriculum_cuts),
+                "stage_switches": log["stage_switches"],
+            },
+            "multi_checkpoints": {
+                name: {
+                    "file": payload["file"],
+                    "best_score": payload["score"],
+                    "best_episode": payload["episode"],
+                }
+                for name, payload in multi_best.items()
             },
             "training_proxy_metrics": [
                 "proxy_block_fee",
@@ -223,6 +476,10 @@ def train(args, env_kwargs: dict | None = None):
                 "proxy_oldest_cover",
                 "proxy_terminal_fair_reward",
                 "proxy_starvation_penalty",
+                "proxy_terminal_risk_penalty",
+                "proxy_packing_reward",
+                "proxy_unused_gas_penalty",
+                "proxy_fairness_gate",
             ],
             "reward_eval_note": (
                 "Training reward is a proxy objective; formal reporting metrics are "
@@ -253,7 +510,15 @@ def main():
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
     parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
+    parser.add_argument("--val-oldest-coverage-floor", type=float, default=C.VALIDATION_OLDEST_COVERAGE_FLOOR)
     parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
+    parser.add_argument("--val-top10-risk-ceil", type=float, default=C.VALIDATION_TOP10_RISK_CEIL)
+    parser.add_argument("--pretrain-policy", type=str, default=C.PRETRAIN_POLICY,
+                        choices=["none", "fifo", "fair_fee", "mixed"])
+    parser.add_argument("--pretrain-epochs", type=int, default=C.PRETRAIN_EPOCHS)
+    parser.add_argument("--pretrain-episodes-per-epoch", type=int, default=C.PRETRAIN_EPISODES_PER_EPOCH)
+    parser.add_argument("--curriculum", action="store_true", default=C.CURRICULUM_ENABLED)
+    parser.add_argument("--curriculum-stage-episodes", type=float, nargs=3, default=C.CURRICULUM_STAGE_EPISODES)
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)

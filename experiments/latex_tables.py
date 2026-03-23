@@ -166,6 +166,39 @@ def generate_fairness_decomp_table(payload: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def generate_constrained_main_table(payload: dict) -> str:
+    """生成约束式主表。"""
+    methods = payload.get("methods", {})
+    present = [m for m in MAIN_METHOD_ORDER if m in methods]
+    lines = []
+    for method_id in present:
+        v = methods[method_id]
+        feas = f"${v.get('feasible_rate', 0.0):.4f}$"
+        cmean = f"${v.get('constrained_fee_mean', -1.0):.4f}$"
+        cstd = f"${v.get('constrained_fee_std', 0.0):.4f}$"
+        lines.append(f"{latex_name(method_id)} & {feas} & {cmean} & {cstd} \\\\")
+    return "\n".join(lines) + "\n"
+
+
+def generate_pareto_main_table(dominance_matrix: dict, anchor_method: str = "ours") -> str:
+    """生成 anchor 方法（默认 Ours）相对各基线的 Pareto 表。"""
+    if anchor_method not in dominance_matrix:
+        return ""
+    lines = []
+    for method_id in MAIN_METHOD_ORDER:
+        if method_id == anchor_method:
+            continue
+        rel = dominance_matrix.get(anchor_method, {}).get(method_id)
+        if not rel:
+            continue
+        dom = f"${rel.get('ours_dominates_rate', 0.0):.4f}$"
+        back = f"${rel.get('baseline_dominates_rate', 0.0):.4f}$"
+        non = f"${rel.get('non_dominated_rate', 0.0):.4f}$"
+        n_pairs = rel.get("n_pairs", 0)
+        lines.append(f"{latex_name(anchor_method)} vs {latex_name(method_id)} & {dom} & {back} & {non} & ${n_pairs}$ \\\\")
+    return "\n".join(lines) + "\n"
+
+
 if __name__ == "__main__":
     import sys
     import os

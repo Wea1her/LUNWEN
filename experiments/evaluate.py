@@ -12,7 +12,8 @@ import config as C
 from env import TxOrderingEnv
 from networks import ActorCritic
 from baselines import run_baseline
-from metrics import compute_all_metrics
+from metrics import (compute_all_metrics, constrained_success_score,
+                     pareto_dominance_rate, pareto_dominates)
 from device_utils import resolve_device
 from method_registry import BASELINE_METHOD_IDS, display_name
 from transaction import Transaction, generate_pool
@@ -146,6 +147,88 @@ def build_fairness_decomposition(raw: dict[str, list[dict]]) -> dict:
             payload["methods"][method][f"{metric}_mean"] = float(np.mean(values)) if values else 0.0
             payload["methods"][method][f"{metric}_std"] = float(np.std(values)) if values else 0.0
     return payload
+
+
+def build_constrained_eval_summary(raw: dict[str, list[dict]],
+                                   constraints: dict | None = None) -> dict:
+    cons = constraints or {
+        "fairness_floor": C.VALIDATION_FAIRNESS_FLOOR,
+        "oldest_coverage_floor": C.VALIDATION_OLDEST_COVERAGE_FLOOR,
+        "risk_ceil": C.VALIDATION_RISK_CEIL,
+        "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,
+    }
+    payload = {
+        "constraints": cons,
+        "methods": {},
+    }
+    for method, seq in raw.items():
+        constrained_scores = [
+            constrained_success_score(metrics, constraints=cons, target_metric="block_fee_norm")
+            for metrics in seq
+        ]
+        feasible = [s for s in constrained_scores if s > -1.0 + 1e-12]
+        payload["methods"][method] = {
+            "feasible_rate": (len(feasible) / len(constrained_scores)) if constrained_scores else 0.0,
+            "constrained_fee_mean": float(np.mean(feasible)) if feasible else -1.0,
+            "constrained_fee_std": float(np.std(feasible)) if feasible else 0.0,
+            "infeasible_count": len(constrained_scores) - len(feasible),
+        }
+    ranked = sorted(
+        payload["methods"].items(),
+        key=lambda kv: (kv[1]["feasible_rate"], kv[1]["constrained_fee_mean"]),
+        reverse=True,
+    )
+    payload["ranking"] = [name for name, _ in ranked]
+    return payload
+
+
+def build_pareto_outputs(raw: dict[str, list[dict]]) -> tuple[dict, dict]:
+    objectives = ["block_fee", "fairness", "risk_exposure", "oldest_coverage"]
+    lower_is_better = {"risk_exposure"}
+    method_ids = list(raw.keys())
+    matrix = {}
+    for a in method_ids:
+        matrix[a] = {}
+        for b in method_ids:
+            if a == b:
+                matrix[a][b] = {
+                    "ours_dominates_rate": 0.0,
+                    "baseline_dominates_rate": 0.0,
+                    "non_dominated_rate": 1.0,
+                    "n_pairs": len(raw.get(a, [])),
+                }
+                continue
+            matrix[a][b] = pareto_dominance_rate(
+                raw.get(a, []),
+                raw.get(b, []),
+                objectives=objectives,
+                lower_is_better=lower_is_better,
+            )
+
+    episode_count = min(len(seq) for seq in raw.values()) if raw else 0
+    episode_rows = []
+    for i in range(episode_count):
+        methods = {m: raw[m][i] for m in method_ids}
+        dom = {}
+        for a in method_ids:
+            dom[a] = {}
+            for b in method_ids:
+                if a == b:
+                    dom[a][b] = False
+                else:
+                    dom[a][b] = pareto_dominates(methods[a], methods[b], objectives, lower_is_better)
+        episode_rows.append({
+            "episode_id": i,
+            "methods": methods,
+            "dominance": dom,
+        })
+
+    pareto_payload = {
+        "objectives": objectives,
+        "lower_is_better": list(lower_is_better),
+        "episodes": episode_rows,
+    }
+    return pareto_payload, matrix
 
 
 def print_table(all_results: dict[str, dict]):
@@ -446,6 +529,18 @@ def main():
             indent=2,
             ensure_ascii=False,
         )
+    with open(os.path.join(args.output, "constrained_eval_summary.json"), "w") as f:
+        json.dump(
+            build_constrained_eval_summary(raw_results),
+            f,
+            indent=2,
+            ensure_ascii=False,
+        )
+    pareto_payload, dominance_matrix = build_pareto_outputs(raw_results)
+    with open(os.path.join(args.output, "pareto_episode_analysis.json"), "w") as f:
+        json.dump(pareto_payload, f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "dominance_matrix.json"), "w") as f:
+        json.dump(dominance_matrix, f, indent=2, ensure_ascii=False)
 
     # 鲁棒性实验
     if args.robustness:

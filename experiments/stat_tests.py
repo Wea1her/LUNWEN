@@ -143,6 +143,8 @@ def run_significance_tests(
             "starvation_gap",
             "tail_wait_reduction",
             "composite_score",
+            "constrained_fee_score",
+            "risk_adjusted_fee_score",
         ]
 
     normalized_main = [_normalize_method_results(m) for m in all_main]
@@ -205,6 +207,8 @@ def run_paired_significance_tests(
             "starvation_gap",
             "tail_wait_reduction",
             "composite_score",
+            "constrained_fee_score",
+            "risk_adjusted_fee_score",
         ]
 
     paired_rows: dict[tuple, dict] = {}
