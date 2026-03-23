@@ -4,12 +4,12 @@ import json
 
 from method_registry import MAIN_METHOD_ORDER, latex_name, normalize_method_id
 
-ABLATION_ORDER = ["Ours-FeeOnly", "Ours-Fee+Fair", "Ours-Fee+Risk", "Ours-Full"]
+ABLATION_ORDER = ["Ours-AgeOnly", "Ours-Age+Risk", "Ours-Age+TerminalFair", "Ours-FullBalanced"]
 ABLATION_LABELS = {
-    "Ours-FeeOnly": "$r=\\alpha r_{\\text{fee}}$",
-    "Ours-Fee+Fair": "$r=\\alpha r_{\\text{fee}}+\\beta r_{\\text{fair}}$",
-    "Ours-Fee+Risk": "$r=\\alpha r_{\\text{fee}}-\\gamma r_{\\text{risk}}$",
-    "Ours-Full": "完整奖励（本文）",
+    "Ours-AgeOnly": "$r=\\alpha r_{\\text{fee}}+\\beta_{age}r_{age}$",
+    "Ours-Age+Risk": "$r=\\alpha r_{\\text{fee}}+\\beta_{age}r_{age}-\\gamma r_{risk}$",
+    "Ours-Age+TerminalFair": "$r=\\alpha r_{\\text{fee}}+\\beta_{age}r_{age}+\\beta_T r_{fair}^{terminal}$",
+    "Ours-FullBalanced": "完整奖励（Age+Oldest+Risk+Terminal）",
 }
 
 STRUCT_ABLATION_ORDER = ["No-SeqSummary", "No-ActionMask", "No-STOP", "Ours-Full"]
@@ -132,6 +132,36 @@ def generate_ablation_table(agg: dict, order=None, labels=None) -> str:
         cells = [labels[m]]
         for met, prec in metrics:
             cells.append(_fmt(d[f"{met}_mean"], d[f"{met}_std"], prec))
+        lines.append(" & ".join(cells) + " \\\\")
+    return "\n".join(lines) + "\n"
+
+
+def generate_composite_table(agg: dict) -> str:
+    """生成综合目标主表: method × composite_score。"""
+    agg = _normalize_method_keyed_dict(agg)
+    present = [m for m in MAIN_METHOD_ORDER if m in agg and "composite_score_mean" in agg[m]]
+    if not present:
+        return ""
+    raw = [agg[m]["composite_score_mean"] for m in present]
+    rendered = [_fmt(agg[m]["composite_score_mean"], agg[m]["composite_score_std"], 4) for m in present]
+    highlighted = _highlight_ranked(raw, rendered, higher_better=True)
+    lines = []
+    for idx, method_id in enumerate(present):
+        lines.append(f"{latex_name(method_id)} & {highlighted[idx]} \\\\")
+    return "\n".join(lines) + "\n"
+
+
+def generate_fairness_decomp_table(payload: dict) -> str:
+    """生成 fairness 分解表。"""
+    methods = payload.get("methods", {})
+    metrics = ["fairness", "oldest_coverage", "starvation_gap", "tail_wait_reduction", "selected_wait_std"]
+    present = [m for m in MAIN_METHOD_ORDER if m in methods]
+    lines = []
+    for method_id in present:
+        values = methods[method_id]
+        cells = [latex_name(method_id)]
+        for metric in metrics:
+            cells.append(_fmt(values.get(f"{metric}_mean", 0.0), values.get(f"{metric}_std", 0.0), 4))
         lines.append(" & ".join(cells) + " \\\\")
     return "\n".join(lines) + "\n"
 

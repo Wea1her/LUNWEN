@@ -22,11 +22,13 @@ from networks import ActorCritic
 from train import train as train_model
 from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
                       evaluate_rl, evaluate_baseline, aggregate,
+                      build_fairness_decomposition,
                       plot_training_curve)
 from baselines import run_baseline
 from metrics import compute_all_metrics
 from latex_tables import (generate_main_table, generate_robustness_table,
-                          generate_ablation_table, ABLATION_ORDER,
+                          generate_ablation_table, generate_composite_table,
+                          generate_fairness_decomp_table, ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS)
 from method_registry import MAIN_METHOD_ORDER, get_baseline_method_ids, normalize_method_id
@@ -198,6 +200,10 @@ def _run_main_evaluation(model, device, args, seed, result_dir):
 
     _write_json(os.path.join(result_dir, "main_results.json"), agg)
     _write_json(os.path.join(result_dir, "main_aggregated_metrics.json"), agg)
+    _write_json(
+        os.path.join(result_dir, "fairness_decomposition.json"),
+        build_fairness_decomposition(raw),
+    )
     _write_json(os.path.join(result_dir, "main_episode_metrics.json"), {
         "seed": seed,
         "setting": "main",
@@ -407,6 +413,8 @@ def run_single_seed(seed, args_dict):
             val_episodes=args.val_episodes,
             val_interval=args.val_interval,
             val_metric=args.val_metric,
+            val_fairness_floor=args.val_fairness_floor,
+            val_risk_ceil=args.val_risk_ceil,
         )
         t0 = time.perf_counter()
         train_model(train_args)
@@ -485,8 +493,21 @@ def aggregate_metric_grid(all_results):
     for result in all_results:
         all_settings.update(result.keys())
     settings = sorted(all_settings, key=str)
-    metrics = ["block_fee", "fairness", "risk_exposure", "gas_util",
-               "risky_rank", "packing_ratio", "top10_risk", "late_promo"]
+    metrics = [
+        "block_fee",
+        "fairness",
+        "risk_exposure",
+        "gas_util",
+        "risky_rank",
+        "packing_ratio",
+        "top10_risk",
+        "late_promo",
+        "oldest_coverage",
+        "starvation_gap",
+        "tail_wait_reduction",
+        "selected_wait_std",
+        "composite_score",
+    ]
 
     agg = {}
     for setting in settings:
@@ -516,8 +537,21 @@ def aggregate_metric_grid(all_results):
 
 def aggregate_across_seeds(all_main=None, all_rob_risk=None, all_rob_pool=None, all_rob_fee=None):
     """跨种子聚合: 对每个方法的 mean 取均值和标准差"""
-    metrics = ["block_fee", "fairness", "risk_exposure", "gas_util",
-               "risky_rank", "packing_ratio", "top10_risk", "late_promo"]
+    metrics = [
+        "block_fee",
+        "fairness",
+        "risk_exposure",
+        "gas_util",
+        "risky_rank",
+        "packing_ratio",
+        "top10_risk",
+        "late_promo",
+        "oldest_coverage",
+        "starvation_gap",
+        "tail_wait_reduction",
+        "selected_wait_std",
+        "composite_score",
+    ]
 
     agg_main = {}
     if all_main:
@@ -553,10 +587,38 @@ def aggregate_across_seeds(all_main=None, all_rob_risk=None, all_rob_pool=None, 
 # ================================================================
 
 REWARD_ABLATION_CONFIGS = {
-    "Ours-FeeOnly":   {"alpha": 1.0, "beta": 0.0,         "gamma_r": 0.0},
-    "Ours-Fee+Fair":  {"alpha": C.ALPHA, "beta": C.BETA,   "gamma_r": 0.0},
-    "Ours-Fee+Risk":  {"alpha": C.ALPHA, "beta": 0.0,      "gamma_r": C.GAMMA_R},
-    "Ours-Full":      {"alpha": C.ALPHA, "beta": C.BETA,   "gamma_r": C.GAMMA_R},
+    "Ours-AgeOnly": {
+        "alpha": C.ALPHA,
+        "beta_age": C.BETA_AGE,
+        "beta_oldest_cover": 0.0,
+        "beta_terminal_fair": 0.0,
+        "gamma_r": 0.0,
+        "gamma_starvation": 0.0,
+    },
+    "Ours-Age+Risk": {
+        "alpha": C.ALPHA,
+        "beta_age": C.BETA_AGE,
+        "beta_oldest_cover": 0.0,
+        "beta_terminal_fair": 0.0,
+        "gamma_r": C.GAMMA_R,
+        "gamma_starvation": 0.0,
+    },
+    "Ours-Age+TerminalFair": {
+        "alpha": C.ALPHA,
+        "beta_age": C.BETA_AGE,
+        "beta_oldest_cover": 0.0,
+        "beta_terminal_fair": C.BETA_TERMINAL_FAIR,
+        "gamma_r": 0.0,
+        "gamma_starvation": 0.0,
+    },
+    "Ours-FullBalanced": {
+        "alpha": C.ALPHA,
+        "beta_age": C.BETA_AGE,
+        "beta_oldest_cover": C.BETA_OLDEST_COVER,
+        "beta_terminal_fair": C.BETA_TERMINAL_FAIR,
+        "gamma_r": C.GAMMA_R,
+        "gamma_starvation": C.GAMMA_STARVATION,
+    },
 }
 
 STRUCT_ABLATION_CONFIGS = {
@@ -593,6 +655,8 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs, shared_pool_path=N
             val_episodes=args.val_episodes,
             val_interval=args.val_interval,
             val_metric=args.val_metric,
+            val_fairness_floor=args.val_fairness_floor,
+            val_risk_ceil=args.val_risk_ceil,
         )
         train_model(train_args, env_kwargs=env_kwargs)
         print(f"  [Ablation] {name} seed={seed} 训练完成", flush=True)
@@ -726,6 +790,7 @@ def _collect_config_snapshot(args):
 STAGE_REQUIRED_FILES = {
     "main": [
         "main_results.json",
+        "fairness_decomposition.json",
         "main_episode_metrics.json",
         "case_study_seed.json",
     ],
@@ -824,7 +889,19 @@ def _method_metric_summary(main_episode_rows: list[dict], method_id: str, metric
 
 
 def _build_behavior_probe(main_episode_rows: list[dict], baseline_methods: list[str]) -> dict:
-    metrics = ["block_fee", "fairness", "risk_exposure", "gas_util", "risky_rank", "top10_risk", "late_promo"]
+    metrics = [
+        "block_fee",
+        "fairness",
+        "risk_exposure",
+        "gas_util",
+        "risky_rank",
+        "top10_risk",
+        "late_promo",
+        "oldest_coverage",
+        "starvation_gap",
+        "tail_wait_reduction",
+        "composite_score",
+    ]
     summary_by_method = {}
     for method_id in ["ours", *baseline_methods]:
         summary_by_method[method_id] = {m: _method_metric_summary(main_episode_rows, method_id, m) for m in metrics}
@@ -854,7 +931,7 @@ def _build_behavior_probe(main_episode_rows: list[dict], baseline_methods: list[
                 base = float(base)
                 diff = ours - base
                 diffs.append(diff)
-                if metric in {"risk_exposure", "top10_risk"}:
+                if metric in {"risk_exposure", "top10_risk", "starvation_gap"}:
                     better_flags.append(1.0 if ours < base else 0.0)
                 elif metric == "risky_rank":
                     better_flags.append(1.0 if abs(ours - 0.5) < abs(base - 0.5) else 0.0)
@@ -883,6 +960,37 @@ def _build_behavior_probe(main_episode_rows: list[dict], baseline_methods: list[
         "paired_deltas_ours_vs_baselines": paired_deltas,
         "note": "paired_deltas are computed on shared_pool_id aligned episodes",
     }
+
+
+def _build_fairness_decomposition_from_rows(main_episode_rows: list[dict], baseline_methods: list[str]) -> dict:
+    metrics = [
+        "fairness",
+        "oldest_coverage",
+        "starvation_gap",
+        "tail_wait_reduction",
+        "selected_wait_std",
+        "composite_score",
+    ]
+    payload = {
+        "settings": {
+            "oldest_ratio": C.FAIR_OLDEST_RATIO,
+            "tail_quantile": C.FAIR_TAIL_QUANTILE,
+        },
+        "metrics": metrics,
+        "methods": {},
+    }
+
+    for method_id in ["ours", *baseline_methods]:
+        rows = [
+            row for row in main_episode_rows
+            if row.get("setting", "main") == "main" and row.get("method") == method_id
+        ]
+        payload["methods"][method_id] = {}
+        for metric in metrics:
+            vals = [float(row.get("metrics", {}).get(metric, 0.0)) for row in rows]
+            payload["methods"][method_id][f"{metric}_mean"] = float(np.mean(vals)) if vals else 0.0
+            payload["methods"][method_id][f"{metric}_std"] = float(np.std(vals)) if vals else 0.0
+    return payload
 
 
 def _merge_case_studies(case_study_seed_paths: list[str]) -> dict:
@@ -930,6 +1038,8 @@ def main():
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
+    parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
+    parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
     args = parser.parse_args()
     _resolve_stages(args)
     args.device_map = _parse_device_map(args.device_map)
@@ -1122,6 +1232,13 @@ def main():
             f.write(t2)
         run_summary["outputs"]["table2"] = os.path.basename(t2_path)
 
+        table_composite = generate_composite_table(agg_main)
+        if table_composite:
+            table_composite_path = os.path.join(args.output, "table_composite_main.tex")
+            with open(table_composite_path, "w") as f:
+                f.write(table_composite)
+            run_summary["outputs"]["table_composite_main"] = os.path.basename(table_composite_path)
+
     if "robustness" in args.stages and agg_rob_risk and agg_rob_pool and agg_rob_fee:
         agg_rob_risk_path = os.path.join(args.output, "aggregated_robustness_risk.json")
         agg_rob_pool_path = os.path.join(args.output, "aggregated_robustness_pool.json")
@@ -1156,6 +1273,19 @@ def main():
             behavior_probe_path = os.path.join(args.output, "behavior_probe.json")
             _write_json(behavior_probe_path, behavior_probe)
             run_summary["outputs"]["behavior_probe"] = os.path.basename(behavior_probe_path)
+
+            fairness_decomp = _build_fairness_decomposition_from_rows(
+                main_episode_rows,
+                args.baseline_methods,
+            )
+            fairness_decomp_path = os.path.join(args.output, "fairness_decomposition.json")
+            _write_json(fairness_decomp_path, fairness_decomp)
+            run_summary["outputs"]["fairness_decomposition"] = os.path.basename(fairness_decomp_path)
+            fairness_tex = generate_fairness_decomp_table(fairness_decomp)
+            fairness_tex_path = os.path.join(args.output, "table_fairness_decomp.tex")
+            with open(fairness_tex_path, "w") as f:
+                f.write(fairness_tex)
+            run_summary["outputs"]["table_fairness_decomp"] = os.path.basename(fairness_tex_path)
 
         merged_case_study = _merge_case_studies(case_study_seed_paths)
         if merged_case_study["seed_case_studies"]:

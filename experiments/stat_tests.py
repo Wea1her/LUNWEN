@@ -139,6 +139,10 @@ def run_significance_tests(
             "packing_ratio",
             "top10_risk",
             "late_promo",
+            "oldest_coverage",
+            "starvation_gap",
+            "tail_wait_reduction",
+            "composite_score",
         ]
 
     normalized_main = [_normalize_method_results(m) for m in all_main]
@@ -197,6 +201,10 @@ def run_paired_significance_tests(
             "packing_ratio",
             "top10_risk",
             "late_promo",
+            "oldest_coverage",
+            "starvation_gap",
+            "tail_wait_reduction",
+            "composite_score",
         ]
 
     paired_rows: dict[tuple, dict] = {}

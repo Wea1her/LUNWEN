@@ -121,12 +121,39 @@ def episode_rows(raw: dict[str, list[dict]], setting: str, setting_value) -> lis
     return rows
 
 
+def build_fairness_decomposition(raw: dict[str, list[dict]]) -> dict:
+    """输出主实验 fairness 分解统计。"""
+    metrics = [
+        "fairness",
+        "oldest_coverage",
+        "starvation_gap",
+        "tail_wait_reduction",
+        "selected_wait_std",
+        "composite_score",
+    ]
+    payload = {
+        "settings": {
+            "oldest_ratio": C.FAIR_OLDEST_RATIO,
+            "tail_quantile": C.FAIR_TAIL_QUANTILE,
+        },
+        "metrics": metrics,
+        "methods": {},
+    }
+    for method, seq in raw.items():
+        payload["methods"][method] = {}
+        for metric in metrics:
+            values = [float(item.get(metric, 0.0)) for item in seq]
+            payload["methods"][method][f"{metric}_mean"] = float(np.mean(values)) if values else 0.0
+            payload["methods"][method][f"{metric}_std"] = float(np.std(values)) if values else 0.0
+    return payload
+
+
 def print_table(all_results: dict[str, dict]):
     """打印结果表"""
     print(f"{'方法':<20s} {'区块收益':>10s} {'公平性':>10s} "
           f"{'风险暴露':>10s} {'Gas利用':>10s} "
-          f"{'风险排名':>10s} {'打包比':>10s}")
-    print("-" * 90)
+          f"{'风险排名':>10s} {'打包比':>10s} {'综合分':>10s}")
+    print("-" * 104)
     for name, agg in all_results.items():
         try:
             method_label = display_name(name)
@@ -138,7 +165,8 @@ def print_table(all_results: dict[str, dict]):
               f"{agg['risk_exposure_mean']:>8.4f} "
               f"{agg['gas_util_mean']:>8.4f} "
               f"{agg.get('risky_rank_mean', 0.5):>8.4f} "
-              f"{agg.get('packing_ratio_mean', 0.0):>8.4f}")
+              f"{agg.get('packing_ratio_mean', 0.0):>8.4f} "
+              f"{agg.get('composite_score_mean', 0.0):>8.4f}")
 
 
 def run_robustness(model, device, n_episodes, pool_size, seed,
@@ -411,6 +439,13 @@ def main():
                 {"pool_size": args.pool_size, "risk_ratio": args.risk_ratio},
             ),
         }, f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "fairness_decomposition.json"), "w") as f:
+        json.dump(
+            build_fairness_decomposition(raw_results),
+            f,
+            indent=2,
+            ensure_ascii=False,
+        )
 
     # 鲁棒性实验
     if args.robustness:

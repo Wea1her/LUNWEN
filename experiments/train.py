@@ -32,11 +32,28 @@ def _run_validation(model: ActorCritic,
                         **env_kwargs)
     metrics = evaluate_rl(model, env, len(validation_pools), device, validation_pools)
     agg = aggregate(metrics)
-    metric_key = f"{args.val_metric}_mean"
-    if metric_key not in agg:
-        raise KeyError(f"validation metric '{args.val_metric}' not found in evaluation metrics.")
-    metric_value = float(agg[metric_key])
-    score = metric_value if _higher_is_better(args.val_metric) else -metric_value
+    if args.val_metric == "constrained_fee":
+        fee = float(agg.get("block_fee_mean", 0.0))
+        fairness = float(agg.get("fairness_mean", 0.0))
+        risk = float(agg.get("risk_exposure_mean", 1.0))
+        feasible = (fairness >= args.val_fairness_floor) and (risk <= args.val_risk_ceil)
+        metric_key = "block_fee_mean"
+        metric_value = fee
+        score = fee if feasible else -float("inf")
+    elif args.val_metric == "hypervolume":
+        fee_norm = float(agg.get("block_fee_norm_mean", 0.0))
+        fairness = float(np.clip(agg.get("fairness_mean", 0.0), 0.0, 1.0))
+        risk = float(np.clip(agg.get("risk_exposure_mean", 1.0), 0.0, 1.0))
+        oldest_cov = float(np.clip(agg.get("oldest_coverage_mean", 0.0), 0.0, 1.0))
+        metric_key = "hypervolume_proxy"
+        metric_value = fee_norm * fairness * (1.0 - risk) * oldest_cov
+        score = metric_value
+    else:
+        metric_key = f"{args.val_metric}_mean"
+        if metric_key not in agg:
+            raise KeyError(f"validation metric '{args.val_metric}' not found in evaluation metrics.")
+        metric_value = float(agg[metric_key])
+        score = metric_value if _higher_is_better(args.val_metric) else -metric_value
     return {
         "metric_key": metric_key,
         "metric_value": metric_value,
@@ -73,6 +90,10 @@ def train(args, env_kwargs: dict | None = None):
         "proxy_fairness": [],
         "proxy_risk_exposure": [],
         "proxy_gas_util": [],
+        "proxy_age_reward": [],
+        "proxy_oldest_cover": [],
+        "proxy_terminal_fair_reward": [],
+        "proxy_starvation_penalty": [],
         "val_episode": [],
         "val_metric": [],
         "val_score": [],
@@ -133,6 +154,13 @@ def train(args, env_kwargs: dict | None = None):
         log["proxy_fairness"].append(proxy["fairness"])
         log["proxy_risk_exposure"].append(proxy["risk_exposure"])
         log["proxy_gas_util"].append(proxy["gas_util"])
+        log["proxy_age_reward"].append(info.get("proxy_age_reward", 0.0))
+        log["proxy_oldest_cover"].append(info.get("proxy_oldest_cover", 0.0))
+        reward_decomp = info.get("reward_decomposition", {})
+        log["proxy_terminal_fair_reward"].append(
+            reward_decomp.get("terminal_fair_reward", 0.0)
+        )
+        log["proxy_starvation_penalty"].append(info.get("proxy_starvation_penalty", 0.0))
 
         if ep % args.log_interval == 0:
             recent = log["reward"][-args.log_interval:]
@@ -179,6 +207,8 @@ def train(args, env_kwargs: dict | None = None):
                 "validation_interval": args.val_interval,
                 "validation_seed": validation_seed,
                 "validation_pool_file": os.path.basename(validation_pool_path),
+                "validation_fairness_floor": args.val_fairness_floor,
+                "validation_risk_ceil": args.val_risk_ceil,
                 "best_episode": best_episode,
                 "best_metric_key": best_metric_key,
                 "best_metric_value": best_metric_value,
@@ -189,6 +219,10 @@ def train(args, env_kwargs: dict | None = None):
                 "proxy_fairness",
                 "proxy_risk_exposure",
                 "proxy_gas_util",
+                "proxy_age_reward",
+                "proxy_oldest_cover",
+                "proxy_terminal_fair_reward",
+                "proxy_starvation_penalty",
             ],
             "reward_eval_note": (
                 "Training reward is a proxy objective; formal reporting metrics are "
@@ -218,6 +252,8 @@ def main():
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
+    parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
+    parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)

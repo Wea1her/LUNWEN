@@ -1,4 +1,4 @@
-"""评价指标: 区块收益、公平性指数、风险暴露度、Gas 利用率"""
+"""评价指标: 区块收益、公平性、风险暴露与综合目标"""
 
 from __future__ import annotations
 import numpy as np
@@ -28,6 +28,50 @@ def jain_fairness_index(selected: List[Transaction], t_now: float) -> float:
     if sum_w2 < 1e-12:
         return 1.0
     return float((sum_w ** 2) / (K * sum_w2))
+
+
+def _oldest_pool_ids(pool: List[Transaction], q: float = C.FAIR_OLDEST_RATIO) -> set[int]:
+    if not pool:
+        return set()
+    k = max(int(len(pool) * q), 1)
+    oldest = sorted(pool, key=lambda tx: tx.arrival_time)[:k]
+    return {tx.tid for tx in oldest}
+
+
+def oldest_coverage_ratio(selected: List[Transaction],
+                          pool: List[Transaction],
+                          q: float = C.FAIR_OLDEST_RATIO) -> float:
+    """候选池 oldest-q 交易被服务比例。"""
+    oldest_ids = _oldest_pool_ids(pool, q=q)
+    if not oldest_ids:
+        return 0.0
+    selected_ids = {tx.tid for tx in selected}
+    served = len(oldest_ids & selected_ids)
+    return served / len(oldest_ids)
+
+
+def starvation_gap(selected: List[Transaction],
+                   pool: List[Transaction],
+                   q: float = C.FAIR_OLDEST_RATIO) -> float:
+    """候选池 oldest-q 中未被服务比例。"""
+    return 1.0 - oldest_coverage_ratio(selected, pool, q=q)
+
+
+def tail_wait_reduction(selected: List[Transaction],
+                        pool: List[Transaction],
+                        q: float = C.FAIR_TAIL_QUANTILE) -> float:
+    """高分位等待时间“被服务覆盖率”近似量化。"""
+    if not pool:
+        return 0.0
+    t_now = max(tx.arrival_time for tx in pool) + 1.0
+    pool_waits = np.array([max(t_now - tx.arrival_time, 0.0) for tx in pool], dtype=np.float64)
+    threshold = float(np.quantile(pool_waits, q))
+    tail_ids = {tx.tid for tx in pool if (t_now - tx.arrival_time) >= threshold}
+    if not tail_ids:
+        return 0.0
+    selected_ids = {tx.tid for tx in selected}
+    served_tail = len(tail_ids & selected_ids)
+    return served_tail / len(tail_ids)
 
 
 def risk_exposure(selected: List[Transaction],
@@ -108,11 +152,34 @@ def late_arrival_promotion_rate(selected: List[Transaction],
     return promoted / len(late_high)
 
 
+def composite_score(metrics: dict,
+                    pool: List[Transaction] | None = None) -> float:
+    """综合目标分数: fee + fairness - risk + oldest_coverage。"""
+    fee = float(metrics.get("block_fee", 0.0))
+    if pool:
+        pool_fee = sum(tx.fee for tx in pool)
+        fee_norm = fee / max(pool_fee, 1e-8)
+    else:
+        fee_norm = float(metrics.get("block_fee_norm", 0.0))
+
+    fairness = float(np.clip(metrics.get("fairness", 0.0), 0.0, 1.0))
+    risk = float(np.clip(metrics.get("risk_exposure", 0.0), 0.0, 1.0))
+    oldest_cov = float(np.clip(metrics.get("oldest_coverage", 0.0), 0.0, 1.0))
+
+    return (
+        C.COMPOSITE_W_FEE * fee_norm
+        + C.COMPOSITE_W_FAIRNESS * fairness
+        - C.COMPOSITE_W_RISK * risk
+        + C.COMPOSITE_W_OLDEST_COVERAGE * oldest_cov
+    )
+
+
 def compute_all_metrics(selected: List[Transaction],
                         pool: List[Transaction]) -> dict:
-    """计算全部八项指标"""
+    """计算主指标 + 公平分解指标 + 综合分数。"""
     t_now = max(tx.arrival_time for tx in pool) + 1.0 if pool else 1.0
-    return {
+    oldest_cov = oldest_coverage_ratio(selected, pool, q=C.FAIR_OLDEST_RATIO)
+    metrics = {
         "block_fee": block_fee_revenue(selected),
         "fairness": jain_fairness_index(selected, t_now),
         "risk_exposure": risk_exposure(selected),
@@ -121,4 +188,16 @@ def compute_all_metrics(selected: List[Transaction],
         "packing_ratio": packing_ratio(selected, pool),
         "top10_risk": top10_risk_ratio(selected),
         "late_promo": late_arrival_promotion_rate(selected, pool),
+        "oldest_coverage": oldest_cov,
+        "starvation_gap": 1.0 - oldest_cov,
+        "tail_wait_reduction": tail_wait_reduction(selected, pool, q=C.FAIR_TAIL_QUANTILE),
     }
+    if selected:
+        waits = np.array([max(t_now - tx.arrival_time, 0.0) for tx in selected], dtype=np.float64)
+        metrics["selected_wait_std"] = float(np.std(waits))
+    else:
+        metrics["selected_wait_std"] = 0.0
+    pool_fee = sum(tx.fee for tx in pool) if pool else 0.0
+    metrics["block_fee_norm"] = metrics["block_fee"] / max(pool_fee, 1e-8)
+    metrics["composite_score"] = composite_score(metrics, pool)
+    return metrics

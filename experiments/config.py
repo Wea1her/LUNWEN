@@ -19,13 +19,27 @@ POOL_REALISM_MODE = "correlated_v1"  # 交易池生成模式: iid_baseline / cor
 
 # ========== 奖励函数 ==========
 ALPHA = 1.0   # 手续费收益权重
-BETA = 0.3    # 确认公平性权重
+BETA = 0.3    # 兼容旧版: 增量 Jain 公平性权重
 GAMMA_R = 0.5 # 风险惩罚权重
 ETA = 0.1     # 提前停止惩罚权重
+BETA_AGE = 0.25
+BETA_OLDEST_COVER = 0.20
+BETA_TERMINAL_FAIR = 0.35
+GAMMA_STARVATION = 0.35
+RISK_CENTER = 0.5
+RISK_POSITION_SIGMA = 0.22
+STOP_FEE_WEIGHT = 1.0
+STOP_OLDEST_UNSERVED_WEIGHT = 1.2
+STOP_OLDEST_WAIT_WEIGHT = 0.8
+STOP_PACKING_WEIGHT = 0.8
 
 # ========== 网络结构 ==========
 TX_FEATURE_DIM = 8       # 交易原始特征维度
 HIDDEN_DIM = 128         # 隐藏层维度
+BLOCK_BASE_DIM = 3       # rem_gas / selected_ratio / acc_fee
+BLOCK_FAIRNESS_SUMMARY_DIM = 9
+BLOCK_SEQ_SUMMARY_DIM = HIDDEN_DIM
+BLOCK_STATE_DIM = BLOCK_BASE_DIM + BLOCK_FAIRNESS_SUMMARY_DIM + BLOCK_SEQ_SUMMARY_DIM
 
 # ========== PPO 训练 ==========
 LR_ACTOR = 3e-4
@@ -46,10 +60,18 @@ HEURISTIC_RISK_THRESHOLD = 0.5  # 启发式风险阈值
 # ========== 评估 ==========
 EVAL_EPISODES = 1000
 RISK_POSITION_RATIO = 0.1  # 风险暴露度: 头/尾 10%
+FAIR_OLDEST_RATIO = 0.2
+FAIR_TAIL_QUANTILE = 0.9
+COMPOSITE_W_FEE = 0.40
+COMPOSITE_W_FAIRNESS = 0.25
+COMPOSITE_W_RISK = 0.20
+COMPOSITE_W_OLDEST_COVERAGE = 0.15
 VALIDATION_EPISODES = 64
 VALIDATION_INTERVAL = 50
-VALIDATION_METRIC = "block_fee"
-LOWER_IS_BETTER_METRICS = ("risk_exposure",)
+VALIDATION_METRIC = "composite_score"
+LOWER_IS_BETTER_METRICS = ("risk_exposure", "starvation_gap", "top10_risk")
+VALIDATION_FAIRNESS_FLOOR = 0.0
+VALIDATION_RISK_CEIL = 1.0
 VALIDATION_SEED_OFFSET = 10000
 BEST_CHECKPOINT_NAME = "best_model.pt"
 FINAL_CHECKPOINT_NAME = "final_model.pt"
