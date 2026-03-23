@@ -1,0 +1,757 @@
+{
+  "metrics": [
+    "block_fee",
+    "fairness",
+    "risk_exposure",
+    "gas_util",
+    "risky_rank",
+    "top10_risk",
+    "late_promo",
+    "oldest_coverage",
+    "starvation_gap",
+    "tail_wait_reduction",
+    "composite_score"
+  ],
+  "summary_by_method": {
+    "ours": {
+      "block_fee": {
+        "mean": 1552.8944600282382,
+        "std": 132.77232410372034,
+        "count": 32
+      },
+      "fairness": {
+        "mean": 0.9317228390610984,
+        "std": 0.018225702800981864,
+        "count": 32
+      },
+      "risk_exposure": {
+        "mean": 0.26589140019657426,
+        "std": 0.06606356247825643,
+        "count": 32
+      },
+      "gas_util": {
+        "mean": 0.9996815833333333,
+        "std": 0.00018805032681881912,
+        "count": 32
+      },
+      "risky_rank": {
+        "mean": 0.4548929474947476,
+        "std": 0.07012488184880135,
+        "count": 32
+      },
+      "top10_risk": {
+        "mean": 0.2712739454334365,
+        "std": 0.10081630948197298,
+        "count": 32
+      },
+      "late_promo": {
+        "mean": 0.005631027903770359,
+        "std": 0.008716415948253162,
+        "count": 32
+      },
+      "oldest_coverage": {
+        "mean": 1.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "starvation_gap": {
+        "mean": 0.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "tail_wait_reduction": {
+        "mean": 1.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "composite_score": {
+        "mean": 0.5847225159319552,
+        "std": 0.019567607527116542,
+        "count": 32
+      }
+    },
+    "fifo": {
+      "block_fee": {
+        "mean": 1543.2682143147317,
+        "std": 144.62114410386903,
+        "count": 32
+      },
+      "fairness": {
+        "mean": 0.9267826364441214,
+        "std": 0.019861398667653223,
+        "count": 32
+      },
+      "risk_exposure": {
+        "mean": 0.19493877571404777,
+        "std": 0.09077695220213779,
+        "count": 32
+      },
+      "gas_util": {
+        "mean": 0.9996787739583333,
+        "std": 0.0001940514650618861,
+        "count": 32
+      },
+      "risky_rank": {
+        "mean": 0.49593776545713364,
+        "std": 0.05905538516873379,
+        "count": 32
+      },
+      "top10_risk": {
+        "mean": 0.1374823394269989,
+        "std": 0.0837149098145513,
+        "count": 32
+      },
+      "late_promo": {
+        "mean": 0.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "oldest_coverage": {
+        "mean": 1.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "starvation_gap": {
+        "mean": 0.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "tail_wait_reduction": {
+        "mean": 1.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "composite_score": {
+        "mean": 0.5960538265044515,
+        "std": 0.02783782800411378,
+        "count": 32
+      }
+    },
+    "gas": {
+      "block_fee": {
+        "mean": 1598.6113743430087,
+        "std": 140.50508219395843,
+        "count": 32
+      },
+      "fairness": {
+        "mean": 0.8231674814420475,
+        "std": 0.02362953278958467,
+        "count": 32
+      },
+      "risk_exposure": {
+        "mean": 0.34170551134010335,
+        "std": 0.1015987751452875,
+        "count": 32
+      },
+      "gas_util": {
+        "mean": 0.9997024822916667,
+        "std": 0.00018878469603558193,
+        "count": 32
+      },
+      "risky_rank": {
+        "mean": 0.4745865499553664,
+        "std": 0.07208983159590852,
+        "count": 32
+      },
+      "top10_risk": {
+        "mean": 0.3133395682834537,
+        "std": 0.12368033876444591,
+        "count": 32
+      },
+      "late_promo": {
+        "mean": 0.17896542459454334,
+        "std": 0.026564041903147196,
+        "count": 32
+      },
+      "oldest_coverage": {
+        "mean": 0.9281250000000001,
+        "std": 0.0443779341752933,
+        "count": 32
+      },
+      "starvation_gap": {
+        "mean": 0.07187500000000001,
+        "std": 0.0443779341752933,
+        "count": 32
+      },
+      "tail_wait_reduction": {
+        "mean": 0.9750000000000001,
+        "std": 0.031180478223116172,
+        "count": 32
+      },
+      "composite_score": {
+        "mean": 0.5391291932278854,
+        "std": 0.037646738091216,
+        "count": 32
+      }
+    },
+    "heuristic": {
+      "block_fee": {
+        "mean": 1542.9167305971,
+        "std": 138.05251115139262,
+        "count": 32
+      },
+      "fairness": {
+        "mean": 0.8216363349005634,
+        "std": 0.024653993875745024,
+        "count": 32
+      },
+      "risk_exposure": {
+        "mean": 0.10467317079742344,
+        "std": 0.13739914823972477,
+        "count": 32
+      },
+      "gas_util": {
+        "mean": 0.9996732625,
+        "std": 0.00020397936285014082,
+        "count": 32
+      },
+      "risky_rank": {
+        "mean": 0.38408296619869453,
+        "std": 0.08095650228578229,
+        "count": 32
+      },
+      "top10_risk": {
+        "mean": 0.0,
+        "std": 0.0,
+        "count": 32
+      },
+      "late_promo": {
+        "mean": 0.18293840134803122,
+        "std": 0.030856539456991218,
+        "count": 32
+      },
+      "oldest_coverage": {
+        "mean": 0.9302083333333333,
+        "std": 0.04457311019861388,
+        "count": 32
+      },
+      "starvation_gap": {
+        "mean": 0.0697916666666667,
+        "std": 0.04457311019861388,
+        "count": 32
+      },
+      "tail_wait_reduction": {
+        "mean": 0.9760416666666667,
+        "std": 0.02532342871071503,
+        "count": 32
+      },
+      "composite_score": {
+        "mean": 0.5774824851039903,
+        "std": 0.021892406105243248,
+        "count": 32
+      }
+    },
+    "fee_risk_linear": {
+      "block_fee": {
+        "mean": 1589.087771870135,
+        "std": 128.23501191654003,
+        "count": 32
+      },
+      "fairness": {
+        "mean": 0.8221099894528788,
+        "std": 0.02234557867425231,
+        "count": 32
+      },
+      "risk_exposure": {
+        "mean": 0.07736994634296182,
+        "std": 0.08128705109214755,
+        "count": 32
+      },
+      "gas_util": {
+        "mean": 0.9996629729166666,
+        "std": 0.00021461657063584998,
+        "count": 32
+      },
+      "risky_rank": {
+        "mean": 0.6731329400988214,
+        "std": 0.06833869968580329,
+        "count": 32
+      },
+      "top10_risk": {
+        "mean": 0.07275985229618162,
+        "std": 0.06942373385576443,
+        "count": 32
+      },
+      "late_promo": {
+        "mean": 0.16389129187385282,
+        "std": 0.03512745000933692,
+        "count": 32
+      },
+      "oldest_coverage": {
+        "mean": 0.9276041666666667,
+        "std": 0.04009740202688393,
+        "count": 32
+      },
+      "starvation_gap": {
+        "mean": 0.07239583333333334,
+        "std": 0.04009740202688393,
+        "count": 32
+      },
+      "tail_wait_reduction": {
+        "mean": 0.9697916666666667,
+        "std": 0.03370560351534048,
+        "count": 32
+      },
+      "composite_score": {
+        "mean": 0.5901104582617737,
+        "std": 0.028617723531511742,
+        "count": 32
+      }
+    },
+    "fair_fee": {
+      "block_fee": {
+        "mean": 1313.6320372700457,
+        "std": 104.23870457365095,
+        "count": 32
+      },
+      "fairness": {
+        "mean": 0.8482687134941269,
+        "std": 0.03525628531364316,
+        "count": 32
+      },
+      "risk_exposure": {
+        "mean": 0.3431540103440597,
+        "std": 0.11282086371172126,
+        "count": 32
+      },
+      "gas_util": {
+        "mean": 0.9995629416666667,
+        "std": 0.00016827792693768182,
+        "count": 32
+      },
+      "risky_rank": {
+        "mean": 0.39641131865865675,
+        "std": 0.0829987673003833,
+        "count": 32
+      },
+      "top10_risk": {
+        "mean": 0.28726618937048504,
+        "std": 0.11819793666450996,
+        "count": 32
+      },
+      "late_promo": {
+        "mean": 0.038958034260634,
+        "std": 0.02866971704545711,
+        "count": 32
+      },
+      "oldest_coverage": {
+        "mean": 0.9057291666666667,
+        "std": 0.04095419506900361,
+        "count": 32
+      },
+      "starvation_gap": {
+        "mean": 0.09427083333333333,
+        "std": 0.04095419506900361,
+        "count": 32
+      },
+      "tail_wait_reduction": {
+        "mean": 0.9541666666666666,
+        "std": 0.044682522061515025,
+        "count": 32
+      },
+      "composite_score": {
+        "mean": 0.4953148263313643,
+        "std": 0.031473037248493936,
+        "count": 32
+      }
+    }
+  },
+  "paired_deltas_ours_vs_baselines": {
+    "fifo": {
+      "block_fee": {
+        "mean_delta": 9.62624571350623,
+        "std_delta": 65.97061999887944,
+        "median_delta": 15.910110634439206,
+        "ours_better_rate": 0.5625,
+        "n_pairs": 32
+      },
+      "fairness": {
+        "mean_delta": 0.0049402026169769915,
+        "std_delta": 0.004873601229152712,
+        "median_delta": 0.005736678418053032,
+        "ours_better_rate": 0.84375,
+        "n_pairs": 32
+      },
+      "risk_exposure": {
+        "mean_delta": 0.07095262448252648,
+        "std_delta": 0.08736929650313872,
+        "median_delta": 0.06516418364244451,
+        "ours_better_rate": 0.21875,
+        "n_pairs": 32
+      },
+      "gas_util": {
+        "mean_delta": 2.809375000002723e-06,
+        "std_delta": 0.0002606600108690945,
+        "median_delta": 4.326666666670809e-05,
+        "ours_better_rate": 0.5625,
+        "n_pairs": 32
+      },
+      "risky_rank": {
+        "mean_delta": -0.041044817962385946,
+        "std_delta": 0.04117181146193902,
+        "median_delta": -0.03831326561419379,
+        "ours_better_rate": 0.3125,
+        "n_pairs": 32
+      },
+      "top10_risk": {
+        "mean_delta": 0.13379160600643766,
+        "std_delta": 0.07383237567363264,
+        "median_delta": 0.12693498452012386,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "late_promo": {
+        "mean_delta": 0.005631027903770359,
+        "std_delta": 0.008716415948253162,
+        "median_delta": 0.0,
+        "ours_better_rate": 0.34375,
+        "n_pairs": 32
+      },
+      "oldest_coverage": {
+        "mean_delta": 0.0,
+        "std_delta": 0.0,
+        "median_delta": 0.0,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "starvation_gap": {
+        "mean_delta": 0.0,
+        "std_delta": 0.0,
+        "median_delta": 0.0,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "tail_wait_reduction": {
+        "mean_delta": 0.0,
+        "std_delta": 0.0,
+        "median_delta": 0.0,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "composite_score": {
+        "mean_delta": -0.01133131057249636,
+        "std_delta": 0.0220982367846451,
+        "median_delta": -0.011264950416166652,
+        "ours_better_rate": 0.25,
+        "n_pairs": 32
+      }
+    },
+    "gas": {
+      "block_fee": {
+        "mean_delta": -45.71691431477046,
+        "std_delta": 94.31214139017904,
+        "median_delta": -37.36305717310529,
+        "ours_better_rate": 0.34375,
+        "n_pairs": 32
+      },
+      "fairness": {
+        "mean_delta": 0.10855535761905075,
+        "std_delta": 0.014891620301058558,
+        "median_delta": 0.11088486760647459,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      },
+      "risk_exposure": {
+        "mean_delta": -0.07581411114352911,
+        "std_delta": 0.1134935938752949,
+        "median_delta": -0.08512261726279718,
+        "ours_better_rate": 0.75,
+        "n_pairs": 32
+      },
+      "gas_util": {
+        "mean_delta": -2.089895833333119e-05,
+        "std_delta": 0.00023883438713485043,
+        "median_delta": 4.833333333564838e-07,
+        "ours_better_rate": 0.5,
+        "n_pairs": 32
+      },
+      "risky_rank": {
+        "mean_delta": -0.01969360246061873,
+        "std_delta": 0.0761371974319202,
+        "median_delta": -0.02868218782061807,
+        "ours_better_rate": 0.5,
+        "n_pairs": 32
+      },
+      "top10_risk": {
+        "mean_delta": -0.04206562285001719,
+        "std_delta": 0.09666015212286905,
+        "median_delta": -0.04851221190230478,
+        "ours_better_rate": 0.625,
+        "n_pairs": 32
+      },
+      "late_promo": {
+        "mean_delta": -0.173334396690773,
+        "std_delta": 0.027770326391716883,
+        "median_delta": -0.17194606887589342,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "oldest_coverage": {
+        "mean_delta": 0.07187500000000001,
+        "std_delta": 0.0443779341752933,
+        "median_delta": 0.08333333333333337,
+        "ours_better_rate": 0.9375,
+        "n_pairs": 32
+      },
+      "starvation_gap": {
+        "mean_delta": -0.07187500000000001,
+        "std_delta": 0.0443779341752933,
+        "median_delta": -0.08333333333333337,
+        "ours_better_rate": 0.9375,
+        "n_pairs": 32
+      },
+      "tail_wait_reduction": {
+        "mean_delta": 0.024999999999999994,
+        "std_delta": 0.031180478223116172,
+        "median_delta": 0.016666666666666663,
+        "ours_better_rate": 0.5,
+        "n_pairs": 32
+      },
+      "composite_score": {
+        "mean_delta": 0.045593322704069836,
+        "std_delta": 0.035187799747298014,
+        "median_delta": 0.047808273593971884,
+        "ours_better_rate": 0.875,
+        "n_pairs": 32
+      }
+    },
+    "heuristic": {
+      "block_fee": {
+        "mean_delta": 9.977729431138144,
+        "std_delta": 119.81920061958088,
+        "median_delta": -2.003286267198064,
+        "ours_better_rate": 0.5,
+        "n_pairs": 32
+      },
+      "fairness": {
+        "mean_delta": 0.11008650416053495,
+        "std_delta": 0.016939523996730908,
+        "median_delta": 0.1113864753634295,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      },
+      "risk_exposure": {
+        "mean_delta": 0.16121822939915081,
+        "std_delta": 0.13229707585385123,
+        "median_delta": 0.18777056277056275,
+        "ours_better_rate": 0.125,
+        "n_pairs": 32
+      },
+      "gas_util": {
+        "mean_delta": 8.320833333338995e-06,
+        "std_delta": 0.00026918090181010423,
+        "median_delta": 4.609999999999337e-05,
+        "ours_better_rate": 0.53125,
+        "n_pairs": 32
+      },
+      "risky_rank": {
+        "mean_delta": 0.07080998129605308,
+        "std_delta": 0.0967310041975452,
+        "median_delta": 0.07164139398776273,
+        "ours_better_rate": 0.78125,
+        "n_pairs": 32
+      },
+      "top10_risk": {
+        "mean_delta": 0.2712739454334365,
+        "std_delta": 0.10081630948197298,
+        "median_delta": 0.2631578947368421,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "late_promo": {
+        "mean_delta": -0.17730737344426084,
+        "std_delta": 0.03242950599820554,
+        "median_delta": -0.17533783783783785,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "oldest_coverage": {
+        "mean_delta": 0.0697916666666667,
+        "std_delta": 0.04457311019861388,
+        "median_delta": 0.08333333333333337,
+        "ours_better_rate": 0.96875,
+        "n_pairs": 32
+      },
+      "starvation_gap": {
+        "mean_delta": -0.0697916666666667,
+        "std_delta": 0.04457311019861388,
+        "median_delta": -0.08333333333333337,
+        "ours_better_rate": 0.96875,
+        "n_pairs": 32
+      },
+      "tail_wait_reduction": {
+        "mean_delta": 0.023958333333333328,
+        "std_delta": 0.02532342871071503,
+        "median_delta": 0.033333333333333326,
+        "ours_better_rate": 0.5625,
+        "n_pairs": 32
+      },
+      "composite_score": {
+        "mean_delta": 0.007240030827964913,
+        "std_delta": 0.025312372479863763,
+        "median_delta": 0.006112862222042714,
+        "ours_better_rate": 0.59375,
+        "n_pairs": 32
+      }
+    },
+    "fee_risk_linear": {
+      "block_fee": {
+        "mean_delta": -36.193311841896644,
+        "std_delta": 84.10965394626984,
+        "median_delta": -58.25284307824154,
+        "ours_better_rate": 0.40625,
+        "n_pairs": 32
+      },
+      "fairness": {
+        "mean_delta": 0.10961284960821945,
+        "std_delta": 0.01704533301547235,
+        "median_delta": 0.10670764557916562,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      },
+      "risk_exposure": {
+        "mean_delta": 0.1885214538536124,
+        "std_delta": 0.09238219536201153,
+        "median_delta": 0.18726495726495723,
+        "ours_better_rate": 0.03125,
+        "n_pairs": 32
+      },
+      "gas_util": {
+        "mean_delta": 1.8610416666668683e-05,
+        "std_delta": 0.00029850260298481114,
+        "median_delta": 7.303333333336104e-05,
+        "ours_better_rate": 0.5625,
+        "n_pairs": 32
+      },
+      "risky_rank": {
+        "mean_delta": -0.21823999260407378,
+        "std_delta": 0.07741611449036873,
+        "median_delta": -0.19305916332668283,
+        "ours_better_rate": 0.8125,
+        "n_pairs": 32
+      },
+      "top10_risk": {
+        "mean_delta": 0.1985140931372549,
+        "std_delta": 0.08217085350375684,
+        "median_delta": 0.2044956140350877,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "late_promo": {
+        "mean_delta": -0.15826026397008247,
+        "std_delta": 0.035152080624293904,
+        "median_delta": -0.15919428200129954,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "oldest_coverage": {
+        "mean_delta": 0.07239583333333334,
+        "std_delta": 0.04009740202688393,
+        "median_delta": 0.06666666666666665,
+        "ours_better_rate": 0.9375,
+        "n_pairs": 32
+      },
+      "starvation_gap": {
+        "mean_delta": -0.07239583333333334,
+        "std_delta": 0.04009740202688393,
+        "median_delta": -0.06666666666666665,
+        "ours_better_rate": 0.9375,
+        "n_pairs": 32
+      },
+      "tail_wait_reduction": {
+        "mean_delta": 0.030208333333333327,
+        "std_delta": 0.033705603515340486,
+        "median_delta": 0.033333333333333326,
+        "ours_better_rate": 0.5625,
+        "n_pairs": 32
+      },
+      "composite_score": {
+        "mean_delta": -0.00538794232981845,
+        "std_delta": 0.02817419778344116,
+        "median_delta": -0.004436295801755918,
+        "ours_better_rate": 0.375,
+        "n_pairs": 32
+      }
+    },
+    "fair_fee": {
+      "block_fee": {
+        "mean_delta": 239.26242275819268,
+        "std_delta": 116.76332312424061,
+        "median_delta": 214.96560332607908,
+        "ours_better_rate": 0.96875,
+        "n_pairs": 32
+      },
+      "fairness": {
+        "mean_delta": 0.08345412556697143,
+        "std_delta": 0.03127103984493794,
+        "median_delta": 0.07512928334619617,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      },
+      "risk_exposure": {
+        "mean_delta": -0.07726261014748537,
+        "std_delta": 0.11370363697927335,
+        "median_delta": -0.05705882352941177,
+        "ours_better_rate": 0.71875,
+        "n_pairs": 32
+      },
+      "gas_util": {
+        "mean_delta": 0.00011864166666667939,
+        "std_delta": 0.0002501459879305903,
+        "median_delta": 0.00013381666666667513,
+        "ours_better_rate": 0.75,
+        "n_pairs": 32
+      },
+      "risky_rank": {
+        "mean_delta": 0.058481628836090926,
+        "std_delta": 0.054271036828121864,
+        "median_delta": 0.06251424988600093,
+        "ours_better_rate": 0.78125,
+        "n_pairs": 32
+      },
+      "top10_risk": {
+        "mean_delta": -0.0159922439370485,
+        "std_delta": 0.0832687804890856,
+        "median_delta": 0.0,
+        "ours_better_rate": 0.46875,
+        "n_pairs": 32
+      },
+      "late_promo": {
+        "mean_delta": -0.03332700635686364,
+        "std_delta": 0.025994099600130927,
+        "median_delta": -0.027402402402402402,
+        "ours_better_rate": 0.0,
+        "n_pairs": 32
+      },
+      "oldest_coverage": {
+        "mean_delta": 0.09427083333333333,
+        "std_delta": 0.04095419506900361,
+        "median_delta": 0.09166666666666667,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      },
+      "starvation_gap": {
+        "mean_delta": -0.09427083333333333,
+        "std_delta": 0.04095419506900361,
+        "median_delta": -0.09166666666666667,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      },
+      "tail_wait_reduction": {
+        "mean_delta": 0.04583333333333332,
+        "std_delta": 0.044682522061515025,
+        "median_delta": 0.033333333333333326,
+        "ours_better_rate": 0.65625,
+        "n_pairs": 32
+      },
+      "composite_score": {
+        "mean_delta": 0.08940768960059087,
+        "std_delta": 0.03349514998014763,
+        "median_delta": 0.08081077426907357,
+        "ours_better_rate": 1.0,
+        "n_pairs": 32
+      }
+    }
+  },
+  "note": "paired_deltas are computed on shared_pool_id aligned episodes"
+}

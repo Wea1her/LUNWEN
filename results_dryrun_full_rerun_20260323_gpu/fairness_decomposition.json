@@ -1,0 +1,100 @@
+{
+  "settings": {
+    "oldest_ratio": 0.2,
+    "tail_quantile": 0.9
+  },
+  "metrics": [
+    "fairness",
+    "oldest_coverage",
+    "starvation_gap",
+    "tail_wait_reduction",
+    "selected_wait_std",
+    "composite_score"
+  ],
+  "methods": {
+    "ours": {
+      "fairness_mean": 0.9317228390610984,
+      "fairness_std": 0.018225702800981864,
+      "oldest_coverage_mean": 1.0,
+      "oldest_coverage_std": 0.0,
+      "starvation_gap_mean": 0.0,
+      "starvation_gap_std": 0.0,
+      "tail_wait_reduction_mean": 1.0,
+      "tail_wait_reduction_std": 0.0,
+      "selected_wait_std_mean": 56.625444433118695,
+      "selected_wait_std_std": 7.610794389219308,
+      "composite_score_mean": 0.5847225159319552,
+      "composite_score_std": 0.019567607527116542
+    },
+    "fifo": {
+      "fairness_mean": 0.9267826364441214,
+      "fairness_std": 0.019861398667653223,
+      "oldest_coverage_mean": 1.0,
+      "oldest_coverage_std": 0.0,
+      "starvation_gap_mean": 0.0,
+      "starvation_gap_std": 0.0,
+      "tail_wait_reduction_mean": 1.0,
+      "tail_wait_reduction_std": 0.0,
+      "selected_wait_std_mean": 57.52196426302896,
+      "selected_wait_std_std": 7.611556113975403,
+      "composite_score_mean": 0.5960538265044515,
+      "composite_score_std": 0.02783782800411378
+    },
+    "gas": {
+      "fairness_mean": 0.8231674814420475,
+      "fairness_std": 0.02362953278958467,
+      "oldest_coverage_mean": 0.9281250000000001,
+      "oldest_coverage_std": 0.0443779341752933,
+      "starvation_gap_mean": 0.07187500000000001,
+      "starvation_gap_std": 0.0443779341752933,
+      "tail_wait_reduction_mean": 0.9750000000000001,
+      "tail_wait_reduction_std": 0.031180478223116172,
+      "selected_wait_std_mean": 84.12076744293836,
+      "selected_wait_std_std": 7.481452145044316,
+      "composite_score_mean": 0.5391291932278854,
+      "composite_score_std": 0.037646738091216
+    },
+    "heuristic": {
+      "fairness_mean": 0.8216363349005634,
+      "fairness_std": 0.024653993875745024,
+      "oldest_coverage_mean": 0.9302083333333333,
+      "oldest_coverage_std": 0.04457311019861388,
+      "starvation_gap_mean": 0.0697916666666667,
+      "starvation_gap_std": 0.04457311019861388,
+      "tail_wait_reduction_mean": 0.9760416666666667,
+      "tail_wait_reduction_std": 0.02532342871071503,
+      "selected_wait_std_mean": 84.32749213435008,
+      "selected_wait_std_std": 7.7190098153648,
+      "composite_score_mean": 0.5774824851039903,
+      "composite_score_std": 0.021892406105243248
+    },
+    "fee_risk_linear": {
+      "fairness_mean": 0.8221099894528788,
+      "fairness_std": 0.02234557867425231,
+      "oldest_coverage_mean": 0.9276041666666667,
+      "oldest_coverage_std": 0.04009740202688393,
+      "starvation_gap_mean": 0.07239583333333334,
+      "starvation_gap_std": 0.04009740202688393,
+      "tail_wait_reduction_mean": 0.9697916666666667,
+      "tail_wait_reduction_std": 0.03370560351534048,
+      "selected_wait_std_mean": 84.47787743689551,
+      "selected_wait_std_std": 7.651368675089951,
+      "composite_score_mean": 0.5901104582617737,
+      "composite_score_std": 0.028617723531511742
+    },
+    "fair_fee": {
+      "fairness_mean": 0.8482687134941269,
+      "fairness_std": 0.03525628531364316,
+      "oldest_coverage_mean": 0.9057291666666667,
+      "oldest_coverage_std": 0.04095419506900361,
+      "starvation_gap_mean": 0.09427083333333333,
+      "starvation_gap_std": 0.04095419506900361,
+      "tail_wait_reduction_mean": 0.9541666666666666,
+      "tail_wait_reduction_std": 0.044682522061515025,
+      "selected_wait_std_mean": 77.66942605708992,
+      "selected_wait_std_std": 9.861088030822588,
+      "composite_score_mean": 0.4953148263313643,
+      "composite_score_std": 0.031473037248493936
+    }
+  }
+}

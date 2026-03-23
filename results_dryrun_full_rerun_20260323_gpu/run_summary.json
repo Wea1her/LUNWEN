@@ -1,0 +1,77 @@
+{
+  "timestamp": "2026-03-23T16:02:13.136321",
+  "stages": [
+    "main",
+    "robustness",
+    "ablation"
+  ],
+  "allow_random_fallback": false,
+  "resume": false,
+  "skip_existing": false,
+  "workers": 1,
+  "device": "cuda:0",
+  "device_map": {},
+  "baseline_methods": [
+    "fifo",
+    "gas",
+    "heuristic",
+    "fee_risk_linear",
+    "fair_fee"
+  ],
+  "config_snapshot": "config_snapshot.json",
+  "seeds": [
+    42
+  ],
+  "seed_runs": [
+    {
+      "seed": 42,
+      "policy_source": "trained",
+      "stages": [
+        "main",
+        "robustness",
+        "ablation"
+      ],
+      "result_dir": "results_dryrun_full_rerun_20260323_gpu/seed_42/results",
+      "status": "success",
+      "timing_seconds": {
+        "train": 286.51051377499243,
+        "eval": 11.963764444983099,
+        "robustness": 118.82110823900439,
+        "robustness_risk": 47.994567526038736,
+        "robustness_pool": 33.52351336198626,
+        "robustness_fee": 37.30302735097939,
+        "total": 417.7786771559622
+      },
+      "requested_device": "cuda:0",
+      "resolved_device": "cuda:0"
+    }
+  ],
+  "status_counts": {
+    "success": 1,
+    "failed": 0,
+    "skipped_existing": 0,
+    "resumed": 0
+  },
+  "outputs": {
+    "aggregated_main": "aggregated_main.json",
+    "table2": "table2_content.tex",
+    "table_composite_main": "table_composite_main.tex",
+    "aggregated_robustness_risk": "aggregated_robustness_risk.json",
+    "aggregated_robustness_pool": "aggregated_robustness_pool.json",
+    "aggregated_robustness_fee": "aggregated_robustness_fee.json",
+    "table3_risk": "table3_risk_content.tex",
+    "table3_pool": "table3_pool_content.tex",
+    "table3_fee": "table3_fee_content.tex",
+    "behavior_probe": "behavior_probe.json",
+    "fairness_decomposition": "fairness_decomposition.json",
+    "table_fairness_decomp": "table_fairness_decomp.tex",
+    "case_study": "case_study.json",
+    "paired_significance_json": "paired_significance_tests.json",
+    "paired_significance_table": "table_significance_paired.tex",
+    "ablation_reward_json": "ablation_reward.json",
+    "ablation_struct_json": "ablation_struct.json",
+    "ablation_reward_table": "table_ablation_reward.tex",
+    "ablation_struct_table": "table_ablation_struct.tex",
+    "timing": "timing.json"
+  }
+}
