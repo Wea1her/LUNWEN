@@ -1,0 +1,23 @@
+{
+  "variant": "reward_Ours-Full",
+  "seed": 42,
+  "shared_pool_path": "results_dryrun_full/ablation/shared_pools/seed_42.json",
+  "metrics": {
+    "block_fee_mean": 1871.7480257504312,
+    "block_fee_std": 112.22955163816272,
+    "fairness_mean": 0.7918828056216873,
+    "fairness_std": 0.026671998821712242,
+    "risk_exposure_mean": 0.19584584283727485,
+    "risk_exposure_std": 0.09024635338231288,
+    "gas_util_mean": 0.9990226020833333,
+    "gas_util_std": 0.0006251644999594466,
+    "risky_rank_mean": 0.4623479727156067,
+    "risky_rank_std": 0.06393107463500584,
+    "packing_ratio_mean": 0.7084375,
+    "packing_ratio_std": 0.034940270214165334,
+    "top10_risk_mean": 0.13804778126145403,
+    "top10_risk_std": 0.09069893273410409,
+    "late_promo_mean": 0.2299317356423089,
+    "late_promo_std": 0.04626628156523211
+  }
+}

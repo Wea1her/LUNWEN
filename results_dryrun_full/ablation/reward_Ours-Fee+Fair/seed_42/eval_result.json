@@ -1,0 +1,23 @@
+{
+  "variant": "reward_Ours-Fee+Fair",
+  "seed": 42,
+  "shared_pool_path": "results_dryrun_full/ablation/shared_pools/seed_42.json",
+  "metrics": {
+    "block_fee_mean": 1840.2242938530198,
+    "block_fee_std": 124.33249108528511,
+    "fairness_mean": 0.8652205171154043,
+    "fairness_std": 0.02938163009959747,
+    "risk_exposure_mean": 0.34543204094323066,
+    "risk_exposure_std": 0.08103325064766204,
+    "gas_util_mean": 0.999604375,
+    "gas_util_std": 0.00037285048192941536,
+    "risky_rank_mean": 0.36939814994637166,
+    "risky_rank_std": 0.059508234591650076,
+    "packing_ratio_mean": 0.6907291666666666,
+    "packing_ratio_std": 0.04658276963731691,
+    "top10_risk_mean": 0.4657105941416161,
+    "top10_risk_std": 0.13487780526743678,
+    "late_promo_mean": 0.09387182407095333,
+    "late_promo_std": 0.0341183210779114
+  }
+}

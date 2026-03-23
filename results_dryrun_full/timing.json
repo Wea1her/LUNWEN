@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-03-23T13:04:06.145051",
+  "seed_timings": {
+    "42": {
+      "train": 242.9350326769636,
+      "eval": 9.063886235991959,
+      "robustness": 108.21190429694252,
+      "robustness_risk": 42.84676879196195,
+      "robustness_pool": 31.98658082197653,
+      "robustness_fee": 33.37855468300404,
+      "total": 360.6400591020356
+    }
+  },
+  "stage_totals_seconds": {
+    "train": 242.9350326769636,
+    "eval": 9.063886235991959,
+    "robustness": 108.21190429694252,
+    "ablation_reward": 995.7810622639954,
+    "ablation_struct": 808.6852401109645
+  },
+  "total_runtime_seconds": 2167.1695803899784
+}

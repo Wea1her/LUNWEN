@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-03-23T12:28:04.977062",
+  "stages": [
+    "main",
+    "robustness",
+    "ablation"
+  ],
+  "allow_random_fallback": false,
+  "resume": false,
+  "skip_existing": false,
+  "workers": 1,
+  "device": "cuda",
+  "device_map": {},
+  "baseline_methods": [
+    "fifo",
+    "gas",
+    "heuristic",
+    "fee_risk_linear",
+    "fair_fee"
+  ],
+  "config_snapshot": "config_snapshot.json",
+  "seeds": [
+    42
+  ],
+  "seed_runs": [
+    {
+      "seed": 42,
+      "policy_source": "trained",
+      "stages": [
+        "main",
+        "robustness",
+        "ablation"
+      ],
+      "result_dir": "results_dryrun_full/seed_42/results",
+      "status": "success",
+      "timing_seconds": {
+        "train": 242.9350326769636,
+        "eval": 9.063886235991959,
+        "robustness": 108.21190429694252,
+        "robustness_risk": 42.84676879196195,
+        "robustness_pool": 31.98658082197653,
+        "robustness_fee": 33.37855468300404,
+        "total": 360.6400591020356
+      },
+      "requested_device": "auto",
+      "resolved_device": "cuda"
+    }
+  ],
+  "status_counts": {
+    "success": 1,
+    "failed": 0,
+    "skipped_existing": 0,
+    "resumed": 0
+  },
+  "outputs": {
+    "aggregated_main": "aggregated_main.json",
+    "table2": "table2_content.tex",
+    "aggregated_robustness_risk": "aggregated_robustness_risk.json",
+    "aggregated_robustness_pool": "aggregated_robustness_pool.json",
+    "aggregated_robustness_fee": "aggregated_robustness_fee.json",
+    "table3_risk": "table3_risk_content.tex",
+    "table3_pool": "table3_pool_content.tex",
+    "table3_fee": "table3_fee_content.tex",
+    "behavior_probe": "behavior_probe.json",
+    "case_study": "case_study.json",
+    "paired_significance_json": "paired_significance_tests.json",
+    "paired_significance_table": "table_significance_paired.tex",
+    "ablation_reward_json": "ablation_reward.json",
+    "ablation_struct_json": "ablation_struct.json",
+    "ablation_reward_table": "table_ablation_reward.tex",
+    "ablation_struct_table": "table_ablation_struct.tex",
+    "timing": "timing.json"
+  }
+}

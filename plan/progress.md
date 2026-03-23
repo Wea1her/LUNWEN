@@ -144,3 +144,13 @@
 | 第3章 问题建模 | 已修订 | `r_t^{valid}` 定义已扩展为“提前 STOP + 非法动作”联合惩罚，并补充连续非法动作计数项说明 | 2026-03-23 |
 | 第4章 方法设计 | 已修订 | checkpoint 选模口径已改为固定验证池周期评估，不再使用单回合奖励峰值 | 2026-03-23 |
 | 第5章 实验设计 | 已修订 | checkpoint 选模、统计检验口径、环境生成机制均与当前代码同步（validation pool + episode paired tests + correlated\_v1） | 2026-03-23 |
+
+## 十、实验执行记录（2026-03-23）
+
+| 项目 | 记录 |
+|------|------|
+| 启动时间 | 2026-03-23 14:21:38 CST |
+| 执行阶段 | 正式主实验（`main`） |
+| 执行命令 | `python experiments/run_experiments.py --stages main --seeds 42 123 456 789 2025 --episodes 3000 --eval-episodes 1000 --pool-size 300 --output results_formal_main --resume` |
+| 输出目录 | `results_formal_main/` |
+| 当前状态 | 5 个 seed 已并行进入训练阶段，正在运行中 |

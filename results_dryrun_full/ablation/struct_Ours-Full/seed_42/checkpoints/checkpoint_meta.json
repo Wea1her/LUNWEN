@@ -1,0 +1,26 @@
+{
+  "formal_eval_checkpoint": "best_model.pt",
+  "formal_eval_rule": "best_fixed_validation_pool_metric",
+  "best_checkpoint": "best_model.pt",
+  "final_checkpoint": "final_model.pt",
+  "selection_rule": {
+    "type": "fixed_validation_pool",
+    "validation_metric": "block_fee",
+    "higher_is_better": true,
+    "validation_episodes": 64,
+    "validation_interval": 50,
+    "validation_seed": 10042,
+    "validation_pool_file": "validation_pools.json",
+    "best_episode": 150,
+    "best_metric_key": "block_fee_mean",
+    "best_metric_value": 1893.3691401337844,
+    "best_selection_score": 1893.3691401337844
+  },
+  "training_proxy_metrics": [
+    "proxy_block_fee",
+    "proxy_fairness",
+    "proxy_risk_exposure",
+    "proxy_gas_util"
+  ],
+  "reward_eval_note": "Training reward is a proxy objective; formal reporting metrics are computed by the shared metric pipeline in evaluation."
+}

@@ -1,0 +1,23 @@
+{
+  "variant": "struct_No-STOP",
+  "seed": 42,
+  "shared_pool_path": "results_dryrun_full/ablation/shared_pools/seed_42.json",
+  "metrics": {
+    "block_fee_mean": 1754.3975821498686,
+    "block_fee_std": 111.12722941934396,
+    "fairness_mean": 0.7405903120472989,
+    "fairness_std": 0.029606737661553664,
+    "risk_exposure_mean": 0.21876078199845278,
+    "risk_exposure_std": 0.09944620146556936,
+    "gas_util_mean": 0.9990136656249999,
+    "gas_util_std": 0.0008710894308232548,
+    "risky_rank_mean": 0.5257881773254653,
+    "risky_rank_std": 0.06740679610762416,
+    "packing_ratio_mean": 0.694375,
+    "packing_ratio_std": 0.03153963005313933,
+    "top10_risk_mean": 0.07804942403769635,
+    "top10_risk_std": 0.061001203642411156,
+    "late_promo_mean": 0.3405226675372429,
+    "late_promo_std": 0.06318951381237345
+  }
+}

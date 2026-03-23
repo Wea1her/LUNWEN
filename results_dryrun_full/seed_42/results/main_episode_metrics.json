@@ -1,0 +1,4038 @@
+{
+  "seed": 42,
+  "setting": "main",
+  "records": [
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 0,
+      "shared_pool_id": 0,
+      "metrics": {
+        "block_fee": 2079.193965661066,
+        "fairness": 0.7861824611040944,
+        "risk_exposure": 0.14285714285714285,
+        "gas_util": 0.9997872,
+        "risky_rank": 0.4299750467872739,
+        "packing_ratio": 0.7666666666666667,
+        "top10_risk": 0.13043478260869565,
+        "late_promo": 0.22535211267605634
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 1,
+      "shared_pool_id": 1,
+      "metrics": {
+        "block_fee": 1856.5835316900404,
+        "fairness": 0.8055911610978194,
+        "risk_exposure": 0.18181818181818182,
+        "gas_util": 0.9989557,
+        "risky_rank": 0.43667255075022066,
+        "packing_ratio": 0.69,
+        "top10_risk": 0.15,
+        "late_promo": 0.208955223880597
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 2,
+      "shared_pool_id": 2,
+      "metrics": {
+        "block_fee": 2001.0929975855413,
+        "fairness": 0.7649102906255868,
+        "risk_exposure": 0.14285714285714285,
+        "gas_util": 0.9991006333333333,
+        "risky_rank": 0.443064182194617,
+        "packing_ratio": 0.6933333333333334,
+        "top10_risk": 0.1,
+        "late_promo": 0.2537313432835821
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 3,
+      "shared_pool_id": 3,
+      "metrics": {
+        "block_fee": 1862.9798932428455,
+        "fairness": 0.7797204387248806,
+        "risk_exposure": 0.15,
+        "gas_util": 0.9991390666666666,
+        "risky_rank": 0.5707547169811321,
+        "packing_ratio": 0.71,
+        "top10_risk": 0.047619047619047616,
+        "late_promo": 0.34615384615384615
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 4,
+      "shared_pool_id": 4,
+      "metrics": {
+        "block_fee": 1739.6400845237642,
+        "fairness": 0.794015172065676,
+        "risk_exposure": 0.15384615384615385,
+        "gas_util": 0.9998266333333333,
+        "risky_rank": 0.4777972027972028,
+        "packing_ratio": 0.7366666666666667,
+        "top10_risk": 0.13636363636363635,
+        "late_promo": 0.23376623376623376
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 5,
+      "shared_pool_id": 5,
+      "metrics": {
+        "block_fee": 1883.4181618168213,
+        "fairness": 0.8094897048046762,
+        "risk_exposure": 0.23809523809523808,
+        "gas_util": 0.9997204,
+        "risky_rank": 0.4132404181184668,
+        "packing_ratio": 0.6866666666666666,
+        "top10_risk": 0.15,
+        "late_promo": 0.24324324324324326
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 6,
+      "shared_pool_id": 6,
+      "metrics": {
+        "block_fee": 1813.3294038561132,
+        "fairness": 0.778952636206285,
+        "risk_exposure": 0.17391304347826086,
+        "gas_util": 0.9986145,
+        "risky_rank": 0.5537361189535103,
+        "packing_ratio": 0.7733333333333333,
+        "top10_risk": 0.08695652173913043,
+        "late_promo": 0.25925925925925924
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 7,
+      "shared_pool_id": 7,
+      "metrics": {
+        "block_fee": 1799.7407139317236,
+        "fairness": 0.7972808511379176,
+        "risk_exposure": 0.3333333333333333,
+        "gas_util": 0.9996411666666667,
+        "risky_rank": 0.41231684981684985,
+        "packing_ratio": 0.6966666666666667,
+        "top10_risk": 0.25,
+        "late_promo": 0.1267605633802817
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 8,
+      "shared_pool_id": 8,
+      "metrics": {
+        "block_fee": 1972.1029788484923,
+        "fairness": 0.7902192218958076,
+        "risk_exposure": 0.13043478260869565,
+        "gas_util": 0.9994694333333334,
+        "risky_rank": 0.4082608695652174,
+        "packing_ratio": 0.67,
+        "top10_risk": 0.15,
+        "late_promo": 0.234375
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 9,
+      "shared_pool_id": 9,
+      "metrics": {
+        "block_fee": 1804.3763423712394,
+        "fairness": 0.8056734306564755,
+        "risk_exposure": 0.17857142857142858,
+        "gas_util": 0.9979886,
+        "risky_rank": 0.48493568043331076,
+        "packing_ratio": 0.7066666666666667,
+        "top10_risk": 0.09523809523809523,
+        "late_promo": 0.225
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 10,
+      "shared_pool_id": 10,
+      "metrics": {
+        "block_fee": 2086.924235886581,
+        "fairness": 0.7930743422812917,
+        "risk_exposure": 0.2631578947368421,
+        "gas_util": 0.9987323333333333,
+        "risky_rank": 0.46147978642257814,
+        "packing_ratio": 0.6933333333333334,
+        "top10_risk": 0.1,
+        "late_promo": 0.25675675675675674
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 11,
+      "shared_pool_id": 11,
+      "metrics": {
+        "block_fee": 1985.7559322734362,
+        "fairness": 0.7026685857046392,
+        "risk_exposure": 0.15789473684210525,
+        "gas_util": 0.9995929333333333,
+        "risky_rank": 0.4032779316712835,
+        "packing_ratio": 0.7633333333333333,
+        "top10_risk": 0.09090909090909091,
+        "late_promo": 0.24675324675324675
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 12,
+      "shared_pool_id": 12,
+      "metrics": {
+        "block_fee": 1916.158882091343,
+        "fairness": 0.7808402639652683,
+        "risk_exposure": 0.4166666666666667,
+        "gas_util": 0.9981628,
+        "risky_rank": 0.48650793650793656,
+        "packing_ratio": 0.7033333333333334,
+        "top10_risk": 0.3333333333333333,
+        "late_promo": 0.22988505747126436
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 13,
+      "shared_pool_id": 13,
+      "metrics": {
+        "block_fee": 1932.9499613728165,
+        "fairness": 0.7860299794067589,
+        "risk_exposure": 0.3548387096774194,
+        "gas_util": 0.9995426666666667,
+        "risky_rank": 0.4875533951981146,
+        "packing_ratio": 0.7333333333333333,
+        "top10_risk": 0.22727272727272727,
+        "late_promo": 0.2463768115942029
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 14,
+      "shared_pool_id": 14,
+      "metrics": {
+        "block_fee": 1843.0635274099916,
+        "fairness": 0.8030522482500861,
+        "risk_exposure": 0.23333333333333334,
+        "gas_util": 0.9984898333333333,
+        "risky_rank": 0.38811881188118813,
+        "packing_ratio": 0.6766666666666666,
+        "top10_risk": 0.3,
+        "late_promo": 0.2727272727272727
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 15,
+      "shared_pool_id": 15,
+      "metrics": {
+        "block_fee": 1765.7233008432938,
+        "fairness": 0.7981404335349314,
+        "risk_exposure": 0.2857142857142857,
+        "gas_util": 0.9985047666666667,
+        "risky_rank": 0.5857826384142174,
+        "packing_ratio": 0.7,
+        "top10_risk": 0.047619047619047616,
+        "late_promo": 0.2602739726027397
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 16,
+      "shared_pool_id": 16,
+      "metrics": {
+        "block_fee": 1551.5301886848179,
+        "fairness": 0.7302550533464821,
+        "risk_exposure": 0.15384615384615385,
+        "gas_util": 0.9994006,
+        "risky_rank": 0.6014348345954563,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.15
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 17,
+      "shared_pool_id": 17,
+      "metrics": {
+        "block_fee": 2066.7843541076372,
+        "fairness": 0.7826092481894557,
+        "risk_exposure": 0.28,
+        "gas_util": 0.9981455,
+        "risky_rank": 0.44474885844748857,
+        "packing_ratio": 0.7333333333333333,
+        "top10_risk": 0.18181818181818182,
+        "late_promo": 0.22388059701492538
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 18,
+      "shared_pool_id": 18,
+      "metrics": {
+        "block_fee": 1904.5748742142734,
+        "fairness": 0.825219264209811,
+        "risk_exposure": 0.08,
+        "gas_util": 0.9997645,
+        "risky_rank": 0.4814213197969543,
+        "packing_ratio": 0.66,
+        "top10_risk": 0.05263157894736842,
+        "late_promo": 0.16901408450704225
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 19,
+      "shared_pool_id": 19,
+      "metrics": {
+        "block_fee": 1833.2630122645244,
+        "fairness": 0.7915594014612873,
+        "risk_exposure": 0.14285714285714285,
+        "gas_util": 0.9986502333333334,
+        "risky_rank": 0.46356589147286825,
+        "packing_ratio": 0.72,
+        "top10_risk": 0.09523809523809523,
+        "late_promo": 0.2236842105263158
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 20,
+      "shared_pool_id": 20,
+      "metrics": {
+        "block_fee": 1892.772979034406,
+        "fairness": 0.8413858161516167,
+        "risk_exposure": 0.40625,
+        "gas_util": 0.9994371,
+        "risky_rank": 0.453125,
+        "packing_ratio": 0.6766666666666666,
+        "top10_risk": 0.4,
+        "late_promo": 0.13924050632911392
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 21,
+      "shared_pool_id": 21,
+      "metrics": {
+        "block_fee": 1949.7488095889346,
+        "fairness": 0.7812013815707971,
+        "risk_exposure": 0.22580645161290322,
+        "gas_util": 0.9996059666666667,
+        "risky_rank": 0.4637266911664625,
+        "packing_ratio": 0.7933333333333333,
+        "top10_risk": 0.17391304347826086,
+        "late_promo": 0.2647058823529412
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 22,
+      "shared_pool_id": 22,
+      "metrics": {
+        "block_fee": 1753.4233606077555,
+        "fairness": 0.795451653631926,
+        "risk_exposure": 0.11538461538461539,
+        "gas_util": 0.9988869666666667,
+        "risky_rank": 0.4060650887573965,
+        "packing_ratio": 0.6966666666666667,
+        "top10_risk": 0.15,
+        "late_promo": 0.20253164556962025
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 23,
+      "shared_pool_id": 23,
+      "metrics": {
+        "block_fee": 1744.6193406031903,
+        "fairness": 0.7999020456763776,
+        "risk_exposure": 0.07142857142857142,
+        "gas_util": 0.9986142333333333,
+        "risky_rank": 0.45756718528995755,
+        "packing_ratio": 0.6766666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.1744186046511628
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 24,
+      "shared_pool_id": 24,
+      "metrics": {
+        "block_fee": 1876.3773689721245,
+        "fairness": 0.8410319268369644,
+        "risk_exposure": 0.045454545454545456,
+        "gas_util": 0.9990090666666667,
+        "risky_rank": 0.5256081946222791,
+        "packing_ratio": 0.7133333333333334,
+        "top10_risk": 0.0,
+        "late_promo": 0.20833333333333334
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 25,
+      "shared_pool_id": 25,
+      "metrics": {
+        "block_fee": 1779.3177409283005,
+        "fairness": 0.8154162178175184,
+        "risk_exposure": 0.1,
+        "gas_util": 0.9985805333333333,
+        "risky_rank": 0.4731391585760518,
+        "packing_ratio": 0.69,
+        "top10_risk": 0.1,
+        "late_promo": 0.2236842105263158
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 26,
+      "shared_pool_id": 26,
+      "metrics": {
+        "block_fee": 1805.3940842975505,
+        "fairness": 0.7930021811419832,
+        "risk_exposure": 0.10714285714285714,
+        "gas_util": 0.9972031,
+        "risky_rank": 0.41445993031358885,
+        "packing_ratio": 0.6866666666666666,
+        "top10_risk": 0.15,
+        "late_promo": 0.2857142857142857
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 27,
+      "shared_pool_id": 27,
+      "metrics": {
+        "block_fee": 1948.6650011425759,
+        "fairness": 0.7566253274918946,
+        "risk_exposure": 0.1875,
+        "gas_util": 0.9987964,
+        "risky_rank": 0.51912100456621,
+        "packing_ratio": 0.7333333333333333,
+        "top10_risk": 0.09090909090909091,
+        "late_promo": 0.2716049382716049
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 28,
+      "shared_pool_id": 28,
+      "metrics": {
+        "block_fee": 1964.347961110508,
+        "fairness": 0.8044890415153291,
+        "risk_exposure": 0.17391304347826086,
+        "gas_util": 0.9999314333333333,
+        "risky_rank": 0.5231039188925716,
+        "packing_ratio": 0.7466666666666667,
+        "top10_risk": 0.09090909090909091,
+        "late_promo": 0.26666666666666666
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 29,
+      "shared_pool_id": 29,
+      "metrics": {
+        "block_fee": 1754.1462918396255,
+        "fairness": 0.7886858281562424,
+        "risk_exposure": 0.25,
+        "gas_util": 0.9988457333333334,
+        "risky_rank": 0.3077889447236181,
+        "packing_ratio": 0.6666666666666666,
+        "top10_risk": 0.2,
+        "late_promo": 0.2054794520547945
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 30,
+      "shared_pool_id": 30,
+      "metrics": {
+        "block_fee": 1819.972188955221,
+        "fairness": 0.8155965099740908,
+        "risk_exposure": 0.18181818181818182,
+        "gas_util": 0.9995338,
+        "risky_rank": 0.34425133689839565,
+        "packing_ratio": 0.6833333333333333,
+        "top10_risk": 0.2,
+        "late_promo": 0.1794871794871795
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "ours",
+      "episode_id": 31,
+      "shared_pool_id": 31,
+      "metrics": {
+        "block_fee": 1907.9653542572485,
+        "fairness": 0.8019776612600265,
+        "risk_exposure": 0.20833333333333334,
+        "gas_util": 0.9990494333333333,
+        "risky_rank": 0.4725336322869955,
+        "packing_ratio": 0.7466666666666667,
+        "top10_risk": 0.13636363636363635,
+        "late_promo": 0.3
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 0,
+      "shared_pool_id": 0,
+      "metrics": {
+        "block_fee": 1760.564675616479,
+        "fairness": 0.9077323259012745,
+        "risk_exposure": 0.2413793103448276,
+        "gas_util": 0.9999677333333333,
+        "risky_rank": 0.5708248816768087,
+        "packing_ratio": 0.6833333333333333,
+        "top10_risk": 0.1,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 1,
+      "shared_pool_id": 1,
+      "metrics": {
+        "block_fee": 1500.3883810443301,
+        "fairness": 0.9518151917430063,
+        "risk_exposure": 0.25,
+        "gas_util": 0.9999665,
+        "risky_rank": 0.42642857142857143,
+        "packing_ratio": 0.5866666666666667,
+        "top10_risk": 0.29411764705882354,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 2,
+      "shared_pool_id": 2,
+      "metrics": {
+        "block_fee": 1672.0356681511146,
+        "fairness": 0.9220991962844537,
+        "risk_exposure": 0.17647058823529413,
+        "gas_util": 0.9997974,
+        "risky_rank": 0.42156862745098034,
+        "packing_ratio": 0.5833333333333334,
+        "top10_risk": 0.17647058823529413,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 3,
+      "shared_pool_id": 3,
+      "metrics": {
+        "block_fee": 1434.6903145811837,
+        "fairness": 0.9077795716933956,
+        "risk_exposure": 0.15,
+        "gas_util": 0.9997036333333333,
+        "risky_rank": 0.56953125,
+        "packing_ratio": 0.6433333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 4,
+      "shared_pool_id": 4,
+      "metrics": {
+        "block_fee": 1554.4416331389298,
+        "fairness": 0.9285616650037144,
+        "risk_exposure": 0.25806451612903225,
+        "gas_util": 0.9993080666666667,
+        "risky_rank": 0.5040117897494678,
+        "packing_ratio": 0.66,
+        "top10_risk": 0.15789473684210525,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 5,
+      "shared_pool_id": 5,
+      "metrics": {
+        "block_fee": 1355.006061034974,
+        "fairness": 0.9448013091000621,
+        "risk_exposure": 0.3333333333333333,
+        "gas_util": 0.9997414333333333,
+        "risky_rank": 0.5388321995464852,
+        "packing_ratio": 0.5633333333333334,
+        "top10_risk": 0.25,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 6,
+      "shared_pool_id": 6,
+      "metrics": {
+        "block_fee": 1479.7673635861504,
+        "fairness": 0.906001792514978,
+        "risk_exposure": 0.08333333333333333,
+        "gas_util": 0.9996901666666667,
+        "risky_rank": 0.5210375816993464,
+        "packing_ratio": 0.6833333333333333,
+        "top10_risk": 0.05,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 7,
+      "shared_pool_id": 7,
+      "metrics": {
+        "block_fee": 1542.2658902101614,
+        "fairness": 0.9393200166423665,
+        "risk_exposure": 0.25,
+        "gas_util": 0.9997418333333333,
+        "risky_rank": 0.43609625668449203,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.2222222222222222,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 8,
+      "shared_pool_id": 8,
+      "metrics": {
+        "block_fee": 1711.4793684722397,
+        "fairness": 0.9130000033285277,
+        "risk_exposure": 0.10526315789473684,
+        "gas_util": 0.9999640666666667,
+        "risky_rank": 0.4685123212655917,
+        "packing_ratio": 0.58,
+        "top10_risk": 0.11764705882352941,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 9,
+      "shared_pool_id": 9,
+      "metrics": {
+        "block_fee": 1535.095802359349,
+        "fairness": 0.9414727370858988,
+        "risk_exposure": 0.19230769230769232,
+        "gas_util": 0.9996851666666666,
+        "risky_rank": 0.4581506576325229,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.21052631578947367,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 10,
+      "shared_pool_id": 10,
+      "metrics": {
+        "block_fee": 1634.0141709631862,
+        "fairness": 0.9292771132350457,
+        "risk_exposure": 0.13793103448275862,
+        "gas_util": 0.9997942666666667,
+        "risky_rank": 0.4346302784436659,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 11,
+      "shared_pool_id": 11,
+      "metrics": {
+        "block_fee": 1559.9435436881977,
+        "fairness": 0.8640108453542186,
+        "risk_exposure": 0.22727272727272727,
+        "gas_util": 0.9993520333333333,
+        "risky_rank": 0.5321507760532151,
+        "packing_ratio": 0.6866666666666666,
+        "top10_risk": 0.05,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 12,
+      "shared_pool_id": 12,
+      "metrics": {
+        "block_fee": 1633.1201585290469,
+        "fairness": 0.9214057898206277,
+        "risk_exposure": 0.375,
+        "gas_util": 0.9999930333333333,
+        "risky_rank": 0.5195446735395189,
+        "packing_ratio": 0.65,
+        "top10_risk": 0.21052631578947367,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 13,
+      "shared_pool_id": 13,
+      "metrics": {
+        "block_fee": 1647.350652926943,
+        "fairness": 0.9057624628206055,
+        "risk_exposure": 0.17391304347826086,
+        "gas_util": 0.9996272333333334,
+        "risky_rank": 0.543375231815372,
+        "packing_ratio": 0.7066666666666667,
+        "top10_risk": 0.09523809523809523,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 14,
+      "shared_pool_id": 14,
+      "metrics": {
+        "block_fee": 1535.099260534419,
+        "fairness": 0.9312472720503577,
+        "risk_exposure": 0.14285714285714285,
+        "gas_util": 0.9996760333333333,
+        "risky_rank": 0.5001909854851032,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.16666666666666666,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 15,
+      "shared_pool_id": 15,
+      "metrics": {
+        "block_fee": 1366.2700172967939,
+        "fairness": 0.9400344778228047,
+        "risk_exposure": 0.11538461538461539,
+        "gas_util": 0.9997238333333334,
+        "risky_rank": 0.5064102564102564,
+        "packing_ratio": 0.6033333333333334,
+        "top10_risk": 0.05555555555555555,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 16,
+      "shared_pool_id": 16,
+      "metrics": {
+        "block_fee": 1277.478822435196,
+        "fairness": 0.9187312411925658,
+        "risk_exposure": 0.09090909090909091,
+        "gas_util": 0.9999054333333334,
+        "risky_rank": 0.44273240883410375,
+        "packing_ratio": 0.5933333333333334,
+        "top10_risk": 0.058823529411764705,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 17,
+      "shared_pool_id": 17,
+      "metrics": {
+        "block_fee": 1820.5059190468448,
+        "fairness": 0.9094347816400976,
+        "risk_exposure": 0.17391304347826086,
+        "gas_util": 0.9999503333333334,
+        "risky_rank": 0.4588628762541806,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.10526315789473684,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 18,
+      "shared_pool_id": 18,
+      "metrics": {
+        "block_fee": 1598.6847552482052,
+        "fairness": 0.9422225508924923,
+        "risk_exposure": 0.08,
+        "gas_util": 0.9994711333333334,
+        "risky_rank": 0.4748314606741573,
+        "packing_ratio": 0.5966666666666667,
+        "top10_risk": 0.11764705882352941,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 19,
+      "shared_pool_id": 19,
+      "metrics": {
+        "block_fee": 1526.7317366497957,
+        "fairness": 0.9163149375724695,
+        "risk_exposure": 0.13636363636363635,
+        "gas_util": 0.9995218333333333,
+        "risky_rank": 0.5494376757263356,
+        "packing_ratio": 0.65,
+        "top10_risk": 0.05263157894736842,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 20,
+      "shared_pool_id": 20,
+      "metrics": {
+        "block_fee": 1592.5579828085426,
+        "fairness": 0.9486482794937182,
+        "risk_exposure": 0.22857142857142856,
+        "gas_util": 0.9995901666666667,
+        "risky_rank": 0.5303669008587041,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.2222222222222222,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 21,
+      "shared_pool_id": 21,
+      "metrics": {
+        "block_fee": 1665.3805093637902,
+        "fairness": 0.9208556223896445,
+        "risk_exposure": 0.2571428571428571,
+        "gas_util": 0.9995408333333333,
+        "risky_rank": 0.5364459930313589,
+        "packing_ratio": 0.6866666666666666,
+        "top10_risk": 0.15,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 22,
+      "shared_pool_id": 22,
+      "metrics": {
+        "block_fee": 1619.5635887620085,
+        "fairness": 0.9107411598175996,
+        "risk_exposure": 0.21428571428571427,
+        "gas_util": 0.9993898,
+        "risky_rank": 0.4683357879234168,
+        "packing_ratio": 0.65,
+        "top10_risk": 0.10526315789473684,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 23,
+      "shared_pool_id": 23,
+      "metrics": {
+        "block_fee": 1335.2840698248538,
+        "fairness": 0.9484525276190321,
+        "risk_exposure": 0.2857142857142857,
+        "gas_util": 0.9994703333333333,
+        "risky_rank": 0.6268496099004575,
+        "packing_ratio": 0.5933333333333334,
+        "top10_risk": 0.058823529411764705,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 24,
+      "shared_pool_id": 24,
+      "metrics": {
+        "block_fee": 1804.1045416941142,
+        "fairness": 0.9607484187065045,
+        "risk_exposure": 0.14285714285714285,
+        "gas_util": 0.9994649666666666,
+        "risky_rank": 0.4591565349544074,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.16666666666666666,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 25,
+      "shared_pool_id": 25,
+      "metrics": {
+        "block_fee": 1247.532431160413,
+        "fairness": 0.9288046607494372,
+        "risk_exposure": 0.42105263157894735,
+        "gas_util": 0.9999648333333333,
+        "risky_rank": 0.40897832817337465,
+        "packing_ratio": 0.57,
+        "top10_risk": 0.29411764705882354,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 26,
+      "shared_pool_id": 26,
+      "metrics": {
+        "block_fee": 1537.3552019527972,
+        "fairness": 0.933548420971642,
+        "risk_exposure": 0.3333333333333333,
+        "gas_util": 0.9994114333333334,
+        "risky_rank": 0.4890946502057613,
+        "packing_ratio": 0.6033333333333334,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 27,
+      "shared_pool_id": 27,
+      "metrics": {
+        "block_fee": 1673.205646743396,
+        "fairness": 0.8974777035163919,
+        "risk_exposure": 0.15,
+        "gas_util": 0.9997342333333333,
+        "risky_rank": 0.584825870646766,
+        "packing_ratio": 0.6733333333333333,
+        "top10_risk": 0.05,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 28,
+      "shared_pool_id": 28,
+      "metrics": {
+        "block_fee": 1528.8497266976312,
+        "fairness": 0.9574631213182134,
+        "risk_exposure": 0.14285714285714285,
+        "gas_util": 0.9995216666666666,
+        "risky_rank": 0.5804232804232805,
+        "packing_ratio": 0.6033333333333334,
+        "top10_risk": 0.05555555555555555,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 29,
+      "shared_pool_id": 29,
+      "metrics": {
+        "block_fee": 1287.1207082409207,
+        "fairness": 0.9348198803787952,
+        "risk_exposure": 0.23809523809523808,
+        "gas_util": 0.9996862,
+        "risky_rank": 0.37779690189328746,
+        "packing_ratio": 0.5566666666666666,
+        "top10_risk": 0.25,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 30,
+      "shared_pool_id": 30,
+      "metrics": {
+        "block_fee": 1467.907818832015,
+        "fairness": 0.9433447185043576,
+        "risk_exposure": 0.13043478260869565,
+        "gas_util": 0.9996791333333334,
+        "risky_rank": 0.4112615823235924,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.16666666666666666,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fifo",
+      "episode_id": 31,
+      "shared_pool_id": 31,
+      "metrics": {
+        "block_fee": 1480.7864364773986,
+        "fairness": 0.9311145710475843,
+        "risk_exposure": 0.0,
+        "gas_util": 0.999686,
+        "risky_rank": 0.5193122939236927,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 0,
+      "shared_pool_id": 0,
+      "metrics": {
+        "block_fee": 1954.5132839058385,
+        "fairness": 0.8245517891353658,
+        "risk_exposure": 0.18181818181818182,
+        "gas_util": 0.9998238,
+        "risky_rank": 0.4739936680235187,
+        "packing_ratio": 0.6733333333333333,
+        "top10_risk": 0.25,
+        "late_promo": 0.15492957746478872
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 1,
+      "shared_pool_id": 1,
+      "metrics": {
+        "block_fee": 1554.7319389654726,
+        "fairness": 0.8189498811107957,
+        "risk_exposure": 0.4166666666666667,
+        "gas_util": 0.9997023666666667,
+        "risky_rank": 0.5905797101449276,
+        "packing_ratio": 0.6166666666666667,
+        "top10_risk": 0.16666666666666666,
+        "late_promo": 0.208955223880597
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 2,
+      "shared_pool_id": 2,
+      "metrics": {
+        "block_fee": 1719.5601764605858,
+        "fairness": 0.8046661871074263,
+        "risk_exposure": 0.3684210526315789,
+        "gas_util": 0.9996055,
+        "risky_rank": 0.48107628622117093,
+        "packing_ratio": 0.5966666666666667,
+        "top10_risk": 0.29411764705882354,
+        "late_promo": 0.19402985074626866
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 3,
+      "shared_pool_id": 3,
+      "metrics": {
+        "block_fee": 1524.6537177081816,
+        "fairness": 0.8179008228758156,
+        "risk_exposure": 0.30434782608695654,
+        "gas_util": 0.9997921666666667,
+        "risky_rank": 0.617632850241546,
+        "packing_ratio": 0.6033333333333334,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.1794871794871795
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 4,
+      "shared_pool_id": 4,
+      "metrics": {
+        "block_fee": 1506.002158633846,
+        "fairness": 0.8207464761862869,
+        "risk_exposure": 0.2962962962962963,
+        "gas_util": 0.9998884666666666,
+        "risky_rank": 0.5383670963781461,
+        "packing_ratio": 0.6066666666666667,
+        "top10_risk": 0.3333333333333333,
+        "late_promo": 0.16883116883116883
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 5,
+      "shared_pool_id": 5,
+      "metrics": {
+        "block_fee": 1425.8011695863988,
+        "fairness": 0.8465542989259016,
+        "risk_exposure": 0.3181818181818182,
+        "gas_util": 0.9997423333333333,
+        "risky_rank": 0.4661796536796537,
+        "packing_ratio": 0.5633333333333334,
+        "top10_risk": 0.25,
+        "late_promo": 0.16216216216216217
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 6,
+      "shared_pool_id": 6,
+      "metrics": {
+        "block_fee": 1449.786844926357,
+        "fairness": 0.8001169200643167,
+        "risk_exposure": 0.13043478260869565,
+        "gas_util": 0.9999824333333334,
+        "risky_rank": 0.3971014492753624,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.10526315789473684,
+        "late_promo": 0.1728395061728395
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 7,
+      "shared_pool_id": 7,
+      "metrics": {
+        "block_fee": 1584.4359781949909,
+        "fairness": 0.8280001321100395,
+        "risk_exposure": 0.375,
+        "gas_util": 0.9994839666666666,
+        "risky_rank": 0.5288461538461539,
+        "packing_ratio": 0.61,
+        "top10_risk": 0.3333333333333333,
+        "late_promo": 0.1267605633802817
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 8,
+      "shared_pool_id": 8,
+      "metrics": {
+        "block_fee": 1665.7790087847998,
+        "fairness": 0.8172902306261842,
+        "risk_exposure": 0.4117647058823529,
+        "gas_util": 0.9997499333333333,
+        "risky_rank": 0.2961696306429549,
+        "packing_ratio": 0.5766666666666667,
+        "top10_risk": 0.35294117647058826,
+        "late_promo": 0.15625
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 9,
+      "shared_pool_id": 9,
+      "metrics": {
+        "block_fee": 1665.845605822515,
+        "fairness": 0.8242116114145562,
+        "risk_exposure": 0.35714285714285715,
+        "gas_util": 0.9997454666666666,
+        "risky_rank": 0.420995670995671,
+        "packing_ratio": 0.6633333333333333,
+        "top10_risk": 0.3684210526315789,
+        "late_promo": 0.175
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 10,
+      "shared_pool_id": 10,
+      "metrics": {
+        "block_fee": 1671.0450006991725,
+        "fairness": 0.8359626702802287,
+        "risk_exposure": 0.4,
+        "gas_util": 0.99931,
+        "risky_rank": 0.49325714285714284,
+        "packing_ratio": 0.5866666666666667,
+        "top10_risk": 0.23529411764705882,
+        "late_promo": 0.17567567567567569
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 11,
+      "shared_pool_id": 11,
+      "metrics": {
+        "block_fee": 1688.1913286390893,
+        "fairness": 0.7380112414605392,
+        "risk_exposure": 0.38095238095238093,
+        "gas_util": 0.9996913,
+        "risky_rank": 0.4109781843771992,
+        "packing_ratio": 0.68,
+        "top10_risk": 0.35,
+        "late_promo": 0.23376623376623376
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 12,
+      "shared_pool_id": 12,
+      "metrics": {
+        "block_fee": 1645.23018126208,
+        "fairness": 0.7987255800862281,
+        "risk_exposure": 0.3076923076923077,
+        "gas_util": 0.9994951,
+        "risky_rank": 0.46092143150966675,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.3888888888888889,
+        "late_promo": 0.1839080459770115
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 13,
+      "shared_pool_id": 13,
+      "metrics": {
+        "block_fee": 1653.617562339026,
+        "fairness": 0.7863939348118439,
+        "risk_exposure": 0.38461538461538464,
+        "gas_util": 0.9997002666666667,
+        "risky_rank": 0.5830062794348507,
+        "packing_ratio": 0.6566666666666666,
+        "top10_risk": 0.2631578947368421,
+        "late_promo": 0.17391304347826086
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 14,
+      "shared_pool_id": 14,
+      "metrics": {
+        "block_fee": 1590.4903127796688,
+        "fairness": 0.840288028053909,
+        "risk_exposure": 0.3548387096774194,
+        "gas_util": 0.9998652,
+        "risky_rank": 0.43539573417944644,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.5,
+        "late_promo": 0.15584415584415584
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 15,
+      "shared_pool_id": 15,
+      "metrics": {
+        "block_fee": 1504.0984435847197,
+        "fairness": 0.8431486796552143,
+        "risk_exposure": 0.3333333333333333,
+        "gas_util": 0.9993966666666667,
+        "risky_rank": 0.5027027027027028,
+        "packing_ratio": 0.62,
+        "top10_risk": 0.3333333333333333,
+        "late_promo": 0.1780821917808219
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 16,
+      "shared_pool_id": 16,
+      "metrics": {
+        "block_fee": 1243.6000135535544,
+        "fairness": 0.8119354325021494,
+        "risk_exposure": 0.42105263157894735,
+        "gas_util": 0.9997577,
+        "risky_rank": 0.4223363286264442,
+        "packing_ratio": 0.55,
+        "top10_risk": 0.1875,
+        "late_promo": 0.1375
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 17,
+      "shared_pool_id": 17,
+      "metrics": {
+        "block_fee": 1690.2929251335802,
+        "fairness": 0.8024668455952086,
+        "risk_exposure": 0.45454545454545453,
+        "gas_util": 0.9999582,
+        "risky_rank": 0.4283216783216784,
+        "packing_ratio": 0.61,
+        "top10_risk": 0.3888888888888889,
+        "late_promo": 0.22388059701492538
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 18,
+      "shared_pool_id": 18,
+      "metrics": {
+        "block_fee": 1530.0042255408987,
+        "fairness": 0.8520039016556878,
+        "risk_exposure": 0.28,
+        "gas_util": 0.9997693333333333,
+        "risky_rank": 0.5861077844311378,
+        "packing_ratio": 0.56,
+        "top10_risk": 0.1875,
+        "late_promo": 0.18309859154929578
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 19,
+      "shared_pool_id": 19,
+      "metrics": {
+        "block_fee": 1518.5410755203393,
+        "fairness": 0.8206127496138524,
+        "risk_exposure": 0.42857142857142855,
+        "gas_util": 0.9995032,
+        "risky_rank": 0.5472200053205639,
+        "packing_ratio": 0.6,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.18421052631578946
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 20,
+      "shared_pool_id": 20,
+      "metrics": {
+        "block_fee": 1696.2487406335779,
+        "fairness": 0.8688570028027248,
+        "risk_exposure": 0.4473684210526316,
+        "gas_util": 0.9995817,
+        "risky_rank": 0.4791486914006327,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.5555555555555556,
+        "late_promo": 0.17721518987341772
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 21,
+      "shared_pool_id": 21,
+      "metrics": {
+        "block_fee": 1730.8992713467944,
+        "fairness": 0.8415312189690343,
+        "risk_exposure": 0.25,
+        "gas_util": 0.9997909333333334,
+        "risky_rank": 0.4663000564015792,
+        "packing_ratio": 0.66,
+        "top10_risk": 0.47368421052631576,
+        "late_promo": 0.17647058823529413
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 22,
+      "shared_pool_id": 22,
+      "metrics": {
+        "block_fee": 1488.7224484330116,
+        "fairness": 0.827948092064143,
+        "risk_exposure": 0.39285714285714285,
+        "gas_util": 0.9999120333333333,
+        "risky_rank": 0.41071428571428575,
+        "packing_ratio": 0.61,
+        "top10_risk": 0.4444444444444444,
+        "late_promo": 0.16455696202531644
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 23,
+      "shared_pool_id": 23,
+      "metrics": {
+        "block_fee": 1754.380364831791,
+        "fairness": 0.8389735230764621,
+        "risk_exposure": 0.13636363636363635,
+        "gas_util": 0.9999343333333334,
+        "risky_rank": 0.503384912959381,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.20930232558139536
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 24,
+      "shared_pool_id": 24,
+      "metrics": {
+        "block_fee": 1751.8473168566154,
+        "fairness": 0.8609774541098187,
+        "risk_exposure": 0.391304347826087,
+        "gas_util": 0.9996365666666667,
+        "risky_rank": 0.4690821256038647,
+        "packing_ratio": 0.6033333333333334,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.19444444444444445
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 25,
+      "shared_pool_id": 25,
+      "metrics": {
+        "block_fee": 1549.7001204710734,
+        "fairness": 0.8238133286330762,
+        "risk_exposure": 0.3,
+        "gas_util": 0.9998509,
+        "risky_rank": 0.5114529914529915,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.3157894736842105,
+        "late_promo": 0.17105263157894737
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 26,
+      "shared_pool_id": 26,
+      "metrics": {
+        "block_fee": 1619.6730807523231,
+        "fairness": 0.8087040713522072,
+        "risk_exposure": 0.27586206896551724,
+        "gas_util": 0.9994155,
+        "risky_rank": 0.4596497562736956,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.3157894736842105,
+        "late_promo": 0.14285714285714285
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 27,
+      "shared_pool_id": 27,
+      "metrics": {
+        "block_fee": 1727.438231025565,
+        "fairness": 0.8127409658617882,
+        "risk_exposure": 0.16666666666666666,
+        "gas_util": 0.9999447,
+        "risky_rank": 0.5772058823529412,
+        "packing_ratio": 0.6833333333333333,
+        "top10_risk": 0.15,
+        "late_promo": 0.13580246913580246
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 28,
+      "shared_pool_id": 28,
+      "metrics": {
+        "block_fee": 1770.765651225912,
+        "fairness": 0.8326939135564999,
+        "risk_exposure": 0.2916666666666667,
+        "gas_util": 0.9996265666666667,
+        "risky_rank": 0.44812499999999994,
+        "packing_ratio": 0.67,
+        "top10_risk": 0.3,
+        "late_promo": 0.2
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 29,
+      "shared_pool_id": 29,
+      "metrics": {
+        "block_fee": 1325.7868302964998,
+        "fairness": 0.8366918505665062,
+        "risk_exposure": 0.6521739130434783,
+        "gas_util": 0.9994554333333333,
+        "risky_rank": 0.3740771123872026,
+        "packing_ratio": 0.5333333333333333,
+        "top10_risk": 0.625,
+        "late_promo": 0.1780821917808219
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 30,
+      "shared_pool_id": 30,
+      "metrics": {
+        "block_fee": 1487.7240452613717,
+        "fairness": 0.8356820625781429,
+        "risk_exposure": 0.391304347826087,
+        "gas_util": 0.9999639666666666,
+        "risky_rank": 0.35234983664237246,
+        "packing_ratio": 0.58,
+        "top10_risk": 0.4117647058823529,
+        "late_promo": 0.20512820512820512
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "gas",
+      "episode_id": 31,
+      "shared_pool_id": 31,
+      "metrics": {
+        "block_fee": 1466.156925800625,
+        "fairness": 0.8202085093035691,
+        "risk_exposure": 0.3333333333333333,
+        "gas_util": 0.9994034,
+        "risky_rank": 0.4540895061728395,
+        "packing_ratio": 0.6433333333333333,
+        "top10_risk": 0.3684210526315789,
+        "late_promo": 0.24285714285714285
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 0,
+      "shared_pool_id": 0,
+      "metrics": {
+        "block_fee": 1892.8790155472739,
+        "fairness": 0.8218796227507562,
+        "risk_exposure": 0.3870967741935484,
+        "gas_util": 0.9998173333333333,
+        "risky_rank": 0.5567381693139021,
+        "packing_ratio": 0.66,
+        "top10_risk": 0.0,
+        "late_promo": 0.15492957746478872
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 1,
+      "shared_pool_id": 1,
+      "metrics": {
+        "block_fee": 1508.5458140927678,
+        "fairness": 0.8239122297499751,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9993903333333334,
+        "risky_rank": 0.37433155080213903,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.19402985074626866
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 2,
+      "shared_pool_id": 2,
+      "metrics": {
+        "block_fee": 1686.7803838828543,
+        "fairness": 0.8038178896537118,
+        "risk_exposure": 0.13333333333333333,
+        "gas_util": 0.9999639333333333,
+        "risky_rank": 0.3792349726775956,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.208955223880597
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 3,
+      "shared_pool_id": 3,
+      "metrics": {
+        "block_fee": 1495.4453506382804,
+        "fairness": 0.8269032086441958,
+        "risk_exposure": 0.1875,
+        "gas_util": 0.9996800666666666,
+        "risky_rank": 0.4453947368421053,
+        "packing_ratio": 0.6366666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.20512820512820512
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 4,
+      "shared_pool_id": 4,
+      "metrics": {
+        "block_fee": 1500.9447705782404,
+        "fairness": 0.8320962878938769,
+        "risk_exposure": 0.375,
+        "gas_util": 0.9997549666666666,
+        "risky_rank": 0.5390211640211641,
+        "packing_ratio": 0.6333333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.16883116883116883
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 5,
+      "shared_pool_id": 5,
+      "metrics": {
+        "block_fee": 1419.0059127594807,
+        "fairness": 0.8288286124794682,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9996439,
+        "risky_rank": 0.3742690058479532,
+        "packing_ratio": 0.5733333333333334,
+        "top10_risk": 0.0,
+        "late_promo": 0.1891891891891892
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 6,
+      "shared_pool_id": 6,
+      "metrics": {
+        "block_fee": 1471.1953620146824,
+        "fairness": 0.801496504020766,
+        "risk_exposure": 0.18181818181818182,
+        "gas_util": 0.9995674666666666,
+        "risky_rank": 0.4366028708133971,
+        "packing_ratio": 0.6366666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.1728395061728395
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 7,
+      "shared_pool_id": 7,
+      "metrics": {
+        "block_fee": 1488.131180072922,
+        "fairness": 0.834588882995991,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9996214666666666,
+        "risky_rank": 0.33333333333333337,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.14084507042253522
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 8,
+      "shared_pool_id": 8,
+      "metrics": {
+        "block_fee": 1683.502064557953,
+        "fairness": 0.8135997088548124,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9993407666666667,
+        "risky_rank": 0.3563218390804598,
+        "packing_ratio": 0.5833333333333334,
+        "top10_risk": 0.0,
+        "late_promo": 0.15625
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 9,
+      "shared_pool_id": 9,
+      "metrics": {
+        "block_fee": 1578.2423066471358,
+        "fairness": 0.8279083063718694,
+        "risk_exposure": 0.13636363636363635,
+        "gas_util": 0.9998324333333334,
+        "risky_rank": 0.38624587847385783,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.1875
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 10,
+      "shared_pool_id": 10,
+      "metrics": {
+        "block_fee": 1586.3011985133792,
+        "fairness": 0.8344563178495182,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9997081666666666,
+        "risky_rank": 0.3268156424581005,
+        "packing_ratio": 0.6,
+        "top10_risk": 0.0,
+        "late_promo": 0.17567567567567569
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 11,
+      "shared_pool_id": 11,
+      "metrics": {
+        "block_fee": 1621.178013228196,
+        "fairness": 0.7272304090044425,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9997356666666667,
+        "risky_rank": 0.29396984924623115,
+        "packing_ratio": 0.6666666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.24675324675324675
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 12,
+      "shared_pool_id": 12,
+      "metrics": {
+        "block_fee": 1664.4148946597236,
+        "fairness": 0.8019196524965727,
+        "risk_exposure": 0.2916666666666667,
+        "gas_util": 0.9994209666666667,
+        "risky_rank": 0.4572594501718213,
+        "packing_ratio": 0.65,
+        "top10_risk": 0.0,
+        "late_promo": 0.19540229885057472
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 13,
+      "shared_pool_id": 13,
+      "metrics": {
+        "block_fee": 1556.8296562514943,
+        "fairness": 0.7892975612280464,
+        "risk_exposure": 0.1111111111111111,
+        "gas_util": 0.999863,
+        "risky_rank": 0.4263097294185377,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.2318840579710145
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 14,
+      "shared_pool_id": 14,
+      "metrics": {
+        "block_fee": 1483.2517612931986,
+        "fairness": 0.8420391435332724,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9997645333333334,
+        "risky_rank": 0.2849162011173185,
+        "packing_ratio": 0.6,
+        "top10_risk": 0.0,
+        "late_promo": 0.14285714285714285
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 15,
+      "shared_pool_id": 15,
+      "metrics": {
+        "block_fee": 1240.0653656872767,
+        "fairness": 0.8467315824315714,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9994092333333333,
+        "risky_rank": 0.32044198895027626,
+        "packing_ratio": 0.6066666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.1780821917808219
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 16,
+      "shared_pool_id": 16,
+      "metrics": {
+        "block_fee": 1333.447243654286,
+        "fairness": 0.7812095047856887,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9997266666666667,
+        "risky_rank": 0.3039772727272727,
+        "packing_ratio": 0.59,
+        "top10_risk": 0.0,
+        "late_promo": 0.15
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 17,
+      "shared_pool_id": 17,
+      "metrics": {
+        "block_fee": 1646.4201139255504,
+        "fairness": 0.7984123782977836,
+        "risk_exposure": 0.06666666666666667,
+        "gas_util": 0.9993176,
+        "risky_rank": 0.3636363636363636,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.1791044776119403
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 18,
+      "shared_pool_id": 18,
+      "metrics": {
+        "block_fee": 1273.9659744390456,
+        "fairness": 0.8420099228724012,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9995322333333333,
+        "risky_rank": 0.3447204968944099,
+        "packing_ratio": 0.54,
+        "top10_risk": 0.0,
+        "late_promo": 0.19718309859154928
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 19,
+      "shared_pool_id": 19,
+      "metrics": {
+        "block_fee": 1492.2866384364117,
+        "fairness": 0.8228506585325499,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9995797333333334,
+        "risky_rank": 0.34408602150537637,
+        "packing_ratio": 0.6233333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.21052631578947367
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 20,
+      "shared_pool_id": 20,
+      "metrics": {
+        "block_fee": 1554.315113590287,
+        "fairness": 0.8649083642084798,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9999839,
+        "risky_rank": 0.3262032085561497,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.20253164556962025
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 21,
+      "shared_pool_id": 21,
+      "metrics": {
+        "block_fee": 1626.6946511128508,
+        "fairness": 0.8392067785692746,
+        "risk_exposure": 0.125,
+        "gas_util": 0.9999331,
+        "risky_rank": 0.37248743718592964,
+        "packing_ratio": 0.6666666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.19117647058823528
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 22,
+      "shared_pool_id": 22,
+      "metrics": {
+        "block_fee": 1462.3019665249517,
+        "fairness": 0.8365982593905128,
+        "risk_exposure": 0.047619047619047616,
+        "gas_util": 0.9999724,
+        "risky_rank": 0.31191735953640715,
+        "packing_ratio": 0.6333333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.12658227848101267
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 23,
+      "shared_pool_id": 23,
+      "metrics": {
+        "block_fee": 1578.6742699893766,
+        "fairness": 0.8315254060151608,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9999044666666667,
+        "risky_rank": 0.3058510638297873,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.0,
+        "late_promo": 0.23255813953488372
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 24,
+      "shared_pool_id": 24,
+      "metrics": {
+        "block_fee": 1704.5576214571633,
+        "fairness": 0.8479122428249226,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9994847666666666,
+        "risky_rank": 0.32142857142857145,
+        "packing_ratio": 0.61,
+        "top10_risk": 0.0,
+        "late_promo": 0.19444444444444445
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 25,
+      "shared_pool_id": 25,
+      "metrics": {
+        "block_fee": 1530.5279969725655,
+        "fairness": 0.8203126941561864,
+        "risk_exposure": 0.34615384615384615,
+        "gas_util": 0.9996333666666667,
+        "risky_rank": 0.5237615787354007,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.0,
+        "late_promo": 0.18421052631578946
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 26,
+      "shared_pool_id": 26,
+      "metrics": {
+        "block_fee": 1594.3739055111553,
+        "fairness": 0.8042322504312271,
+        "risk_exposure": 0.23076923076923078,
+        "gas_util": 0.9993449666666666,
+        "risky_rank": 0.4319984139571768,
+        "packing_ratio": 0.65,
+        "top10_risk": 0.0,
+        "late_promo": 0.11688311688311688
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 27,
+      "shared_pool_id": 27,
+      "metrics": {
+        "block_fee": 1530.1877761195376,
+        "fairness": 0.8168554925304463,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9995100333333333,
+        "risky_rank": 0.2733990147783251,
+        "packing_ratio": 0.68,
+        "top10_risk": 0.0,
+        "late_promo": 0.16049382716049382
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 28,
+      "shared_pool_id": 28,
+      "metrics": {
+        "block_fee": 1822.6065420186544,
+        "fairness": 0.8338887956939802,
+        "risk_exposure": 0.38461538461538464,
+        "gas_util": 0.9996604,
+        "risky_rank": 0.5687357197258187,
+        "packing_ratio": 0.6766666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.22666666666666666
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 29,
+      "shared_pool_id": 29,
+      "metrics": {
+        "block_fee": 1336.4009256637519,
+        "fairness": 0.8358058667160838,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9995524,
+        "risky_rank": 0.3639240506329114,
+        "packing_ratio": 0.53,
+        "top10_risk": 0.0,
+        "late_promo": 0.1643835616438356
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 30,
+      "shared_pool_id": 30,
+      "metrics": {
+        "block_fee": 1477.6747981905621,
+        "fairness": 0.8371496032831645,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9999960666666666,
+        "risky_rank": 0.3401162790697675,
+        "packing_ratio": 0.5766666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.15384615384615385
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "heuristic",
+      "episode_id": 31,
+      "shared_pool_id": 31,
+      "metrics": {
+        "block_fee": 1532.186791076191,
+        "fairness": 0.8227785785513201,
+        "risk_exposure": 0.3448275862068966,
+        "gas_util": 0.9998980666666667,
+        "risky_rank": 0.5032056835903657,
+        "packing_ratio": 0.6666666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.21428571428571427
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 0,
+      "shared_pool_id": 0,
+      "metrics": {
+        "block_fee": 1845.5795667977322,
+        "fairness": 0.823715349419924,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9994424,
+        "risky_rank": 0.6396456627110144,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.0,
+        "late_promo": 0.15492957746478872
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 1,
+      "shared_pool_id": 1,
+      "metrics": {
+        "block_fee": 1595.8289012533673,
+        "fairness": 0.8221049466439874,
+        "risk_exposure": 0.07692307692307693,
+        "gas_util": 0.9993921,
+        "risky_rank": 0.6833060556464812,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.1791044776119403
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 2,
+      "shared_pool_id": 2,
+      "metrics": {
+        "block_fee": 1719.4483575971274,
+        "fairness": 0.7918377092610002,
+        "risk_exposure": 0.125,
+        "gas_util": 0.9995809333333333,
+        "risky_rank": 0.6475409836065573,
+        "packing_ratio": 0.6133333333333333,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.23880597014925373
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 3,
+      "shared_pool_id": 3,
+      "metrics": {
+        "block_fee": 1426.7025771099306,
+        "fairness": 0.8181522219752393,
+        "risk_exposure": 0.047619047619047616,
+        "gas_util": 0.9995675666666667,
+        "risky_rank": 0.7709881640517479,
+        "packing_ratio": 0.58,
+        "top10_risk": 0.0,
+        "late_promo": 0.15384615384615385
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 4,
+      "shared_pool_id": 4,
+      "metrics": {
+        "block_fee": 1483.098546152016,
+        "fairness": 0.8225923100522321,
+        "risk_exposure": 0.07142857142857142,
+        "gas_util": 0.9994440666666666,
+        "risky_rank": 0.6813492063492064,
+        "packing_ratio": 0.6033333333333334,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.19480519480519481
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 5,
+      "shared_pool_id": 5,
+      "metrics": {
+        "block_fee": 1508.3236723155348,
+        "fairness": 0.8419052646752625,
+        "risk_exposure": 0.10714285714285714,
+        "gas_util": 0.9993556,
+        "risky_rank": 0.7408637873754154,
+        "packing_ratio": 0.5766666666666667,
+        "top10_risk": 0.058823529411764705,
+        "late_promo": 0.16216216216216217
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 6,
+      "shared_pool_id": 6,
+      "metrics": {
+        "block_fee": 1490.6268539792982,
+        "fairness": 0.8140140329130707,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9993243,
+        "risky_rank": 0.7037259615384616,
+        "packing_ratio": 0.6433333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.16049382716049382
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 7,
+      "shared_pool_id": 7,
+      "metrics": {
+        "block_fee": 1479.0081219158224,
+        "fairness": 0.8376212297143494,
+        "risk_exposure": 0.4166666666666667,
+        "gas_util": 0.9999143666666667,
+        "risky_rank": 0.8183823529411764,
+        "packing_ratio": 0.57,
+        "top10_risk": 0.058823529411764705,
+        "late_promo": 0.11267605633802817
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 8,
+      "shared_pool_id": 8,
+      "metrics": {
+        "block_fee": 1743.1244981422908,
+        "fairness": 0.8068690466373886,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9995984,
+        "risky_rank": 0.7345374931581828,
+        "packing_ratio": 0.5833333333333334,
+        "top10_risk": 0.0,
+        "late_promo": 0.125
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 9,
+      "shared_pool_id": 9,
+      "metrics": {
+        "block_fee": 1588.9213301823247,
+        "fairness": 0.8073238025135696,
+        "risk_exposure": 0.04,
+        "gas_util": 0.9999463666666667,
+        "risky_rank": 0.6186666666666666,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.05263157894736842,
+        "late_promo": 0.125
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 10,
+      "shared_pool_id": 10,
+      "metrics": {
+        "block_fee": 1767.393667447522,
+        "fairness": 0.8207861533798088,
+        "risk_exposure": 0.03571428571428571,
+        "gas_util": 0.9998098333333333,
+        "risky_rank": 0.6733838786911414,
+        "packing_ratio": 0.6,
+        "top10_risk": 0.05555555555555555,
+        "late_promo": 0.20270270270270271
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 11,
+      "shared_pool_id": 11,
+      "metrics": {
+        "block_fee": 1593.6429664962752,
+        "fairness": 0.7660576168076159,
+        "risk_exposure": 0.05,
+        "gas_util": 0.9999310333333333,
+        "risky_rank": 0.6975274725274727,
+        "packing_ratio": 0.61,
+        "top10_risk": 0.05555555555555555,
+        "late_promo": 0.18181818181818182
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 12,
+      "shared_pool_id": 12,
+      "metrics": {
+        "block_fee": 1639.6262244426844,
+        "fairness": 0.8031936609931347,
+        "risk_exposure": 0.16,
+        "gas_util": 0.9997685,
+        "risky_rank": 0.5694736842105264,
+        "packing_ratio": 0.6366666666666667,
+        "top10_risk": 0.15789473684210525,
+        "late_promo": 0.1724137931034483
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 13,
+      "shared_pool_id": 13,
+      "metrics": {
+        "block_fee": 1711.2729412799497,
+        "fairness": 0.8086160214667217,
+        "risk_exposure": 0.06896551724137931,
+        "gas_util": 0.9999854,
+        "risky_rank": 0.653580901856764,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.05263157894736842,
+        "late_promo": 0.17391304347826086
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 14,
+      "shared_pool_id": 14,
+      "metrics": {
+        "block_fee": 1477.9931915853367,
+        "fairness": 0.8337554752255038,
+        "risk_exposure": 0.12903225806451613,
+        "gas_util": 0.9994265333333333,
+        "risky_rank": 0.5826844642195032,
+        "packing_ratio": 0.5833333333333334,
+        "top10_risk": 0.23529411764705882,
+        "late_promo": 0.14285714285714285
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 15,
+      "shared_pool_id": 15,
+      "metrics": {
+        "block_fee": 1435.9810228134922,
+        "fairness": 0.8439582485548783,
+        "risk_exposure": 0.04,
+        "gas_util": 0.9999627666666666,
+        "risky_rank": 0.7699447513812154,
+        "packing_ratio": 0.6066666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.1780821917808219
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 16,
+      "shared_pool_id": 16,
+      "metrics": {
+        "block_fee": 1359.882358190658,
+        "fairness": 0.7739376506873055,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9996666333333334,
+        "risky_rank": 0.7542857142857143,
+        "packing_ratio": 0.5866666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.1125
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 17,
+      "shared_pool_id": 17,
+      "metrics": {
+        "block_fee": 1756.9816753104058,
+        "fairness": 0.8042002369533594,
+        "risk_exposure": 0.21052631578947367,
+        "gas_util": 0.9998281666666666,
+        "risky_rank": 0.5565452091767883,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.21052631578947367,
+        "late_promo": 0.26865671641791045
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 18,
+      "shared_pool_id": 18,
+      "metrics": {
+        "block_fee": 1519.2784188135538,
+        "fairness": 0.8431808077155102,
+        "risk_exposure": 0.04,
+        "gas_util": 0.9998860666666667,
+        "risky_rank": 0.7478571428571428,
+        "packing_ratio": 0.5633333333333334,
+        "top10_risk": 0.0,
+        "late_promo": 0.18309859154929578
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 19,
+      "shared_pool_id": 19,
+      "metrics": {
+        "block_fee": 1554.1409155854108,
+        "fairness": 0.8177509760835966,
+        "risk_exposure": 0.09523809523809523,
+        "gas_util": 0.9994214,
+        "risky_rank": 0.6282149223325695,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.15789473684210525
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 20,
+      "shared_pool_id": 20,
+      "metrics": {
+        "block_fee": 1735.381042640374,
+        "fairness": 0.8592524392269903,
+        "risk_exposure": 0.10810810810810811,
+        "gas_util": 0.9998936,
+        "risky_rank": 0.5702845702845704,
+        "packing_ratio": 0.6333333333333333,
+        "top10_risk": 0.15789473684210525,
+        "late_promo": 0.13924050632911392
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 21,
+      "shared_pool_id": 21,
+      "metrics": {
+        "block_fee": 1762.524706738156,
+        "fairness": 0.8494547924574228,
+        "risk_exposure": 0.0,
+        "gas_util": 0.999517,
+        "risky_rank": 0.6687614558785022,
+        "packing_ratio": 0.6733333333333333,
+        "top10_risk": 0.0,
+        "late_promo": 0.11764705882352941
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 22,
+      "shared_pool_id": 22,
+      "metrics": {
+        "block_fee": 1443.64046318078,
+        "fairness": 0.8389241553682881,
+        "risk_exposure": 0.08333333333333333,
+        "gas_util": 0.9993669,
+        "risky_rank": 0.5759803921568628,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.1111111111111111,
+        "late_promo": 0.12658227848101267
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 23,
+      "shared_pool_id": 23,
+      "metrics": {
+        "block_fee": 1532.701820977496,
+        "fairness": 0.8497291348472193,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9998562666666667,
+        "risky_rank": 0.7842511306198457,
+        "packing_ratio": 0.6,
+        "top10_risk": 0.0,
+        "late_promo": 0.16279069767441862
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 24,
+      "shared_pool_id": 24,
+      "metrics": {
+        "block_fee": 1758.2268981620366,
+        "fairness": 0.8650071958360922,
+        "risk_exposure": 0.0,
+        "gas_util": 0.9995741,
+        "risky_rank": 0.7427336055729039,
+        "packing_ratio": 0.6066666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.19444444444444445
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 25,
+      "shared_pool_id": 25,
+      "metrics": {
+        "block_fee": 1511.4258745729896,
+        "fairness": 0.8201013804258682,
+        "risk_exposure": 0.07692307692307693,
+        "gas_util": 0.9993317333333334,
+        "risky_rank": 0.6360031720856463,
+        "packing_ratio": 0.65,
+        "top10_risk": 0.10526315789473684,
+        "late_promo": 0.14473684210526316
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 26,
+      "shared_pool_id": 26,
+      "metrics": {
+        "block_fee": 1597.9407466874995,
+        "fairness": 0.8049191991693119,
+        "risk_exposure": 0.03571428571428571,
+        "gas_util": 0.9996329333333334,
+        "risky_rank": 0.6746447270007481,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.05263157894736842,
+        "late_promo": 0.11688311688311688
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 27,
+      "shared_pool_id": 27,
+      "metrics": {
+        "block_fee": 1660.0685164760994,
+        "fairness": 0.7982570182302803,
+        "risk_exposure": 0.043478260869565216,
+        "gas_util": 0.9996698,
+        "risky_rank": 0.7011697197086737,
+        "packing_ratio": 0.66,
+        "top10_risk": 0.0,
+        "late_promo": 0.18518518518518517
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 28,
+      "shared_pool_id": 28,
+      "metrics": {
+        "block_fee": 1728.5624856270706,
+        "fairness": 0.8304832512871003,
+        "risk_exposure": 0.04,
+        "gas_util": 0.9996362666666667,
+        "risky_rank": 0.6193103448275862,
+        "packing_ratio": 0.68,
+        "top10_risk": 0.05,
+        "late_promo": 0.2
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 29,
+      "shared_pool_id": 29,
+      "metrics": {
+        "block_fee": 1436.5358747919645,
+        "fairness": 0.8308201969130254,
+        "risk_exposure": 0.16666666666666666,
+        "gas_util": 0.999991,
+        "risky_rank": 0.635793172690763,
+        "packing_ratio": 0.5566666666666666,
+        "top10_risk": 0.1875,
+        "late_promo": 0.1780821917808219
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 30,
+      "shared_pool_id": 30,
+      "metrics": {
+        "block_fee": 1544.665094838048,
+        "fairness": 0.8428610101944229,
+        "risk_exposure": 0.13043478260869565,
+        "gas_util": 0.9997709666666666,
+        "risky_rank": 0.6296675191815859,
+        "packing_ratio": 0.57,
+        "top10_risk": 0.17647058823529413,
+        "late_promo": 0.14102564102564102
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fee_risk_linear",
+      "episode_id": 31,
+      "shared_pool_id": 31,
+      "metrics": {
+        "block_fee": 1442.2793677410657,
+        "fairness": 0.8161371268626443,
+        "risk_exposure": 0.07692307692307693,
+        "gas_util": 0.9997221333333334,
+        "risky_rank": 0.6291497975708502,
+        "packing_ratio": 0.6366666666666667,
+        "top10_risk": 0.10526315789473684,
+        "late_promo": 0.15714285714285714
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 0,
+      "shared_pool_id": 0,
+      "metrics": {
+        "block_fee": 1324.557300329559,
+        "fairness": 0.8533099885256477,
+        "risk_exposure": 0.4,
+        "gas_util": 0.9996489,
+        "risky_rank": 0.5247058823529411,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.028169014084507043
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 1,
+      "shared_pool_id": 1,
+      "metrics": {
+        "block_fee": 1308.6887265752466,
+        "fairness": 0.8684808522160645,
+        "risk_exposure": 0.3888888888888889,
+        "gas_util": 0.9994570666666667,
+        "risky_rank": 0.3748506571087216,
+        "packing_ratio": 0.6233333333333333,
+        "top10_risk": 0.3333333333333333,
+        "late_promo": 0.029850746268656716
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 2,
+      "shared_pool_id": 2,
+      "metrics": {
+        "block_fee": 1366.6199028911349,
+        "fairness": 0.8610635291564942,
+        "risk_exposure": 0.5714285714285714,
+        "gas_util": 0.9994653666666666,
+        "risky_rank": 0.3236734693877551,
+        "packing_ratio": 0.5866666666666667,
+        "top10_risk": 0.4117647058823529,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 3,
+      "shared_pool_id": 3,
+      "metrics": {
+        "block_fee": 1262.4280300219805,
+        "fairness": 0.8334516224360795,
+        "risk_exposure": 0.125,
+        "gas_util": 0.9996021,
+        "risky_rank": 0.5036764705882353,
+        "packing_ratio": 0.6266666666666667,
+        "top10_risk": 0.0,
+        "late_promo": 0.038461538461538464
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 4,
+      "shared_pool_id": 4,
+      "metrics": {
+        "block_fee": 1427.562027626115,
+        "fairness": 0.8610401872934029,
+        "risk_exposure": 0.2413793103448276,
+        "gas_util": 0.9998355333333333,
+        "risky_rank": 0.46846524924066457,
+        "packing_ratio": 0.6466666666666666,
+        "top10_risk": 0.21052631578947367,
+        "late_promo": 0.012987012987012988
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 5,
+      "shared_pool_id": 5,
+      "metrics": {
+        "block_fee": 1212.1307178396466,
+        "fairness": 0.8582473333579553,
+        "risk_exposure": 0.29411764705882354,
+        "gas_util": 0.9996489,
+        "risky_rank": 0.4324045407636739,
+        "packing_ratio": 0.5733333333333334,
+        "top10_risk": 0.23529411764705882,
+        "late_promo": 0.02702702702702703
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 6,
+      "shared_pool_id": 6,
+      "metrics": {
+        "block_fee": 1320.0010807912743,
+        "fairness": 0.8082879871798421,
+        "risk_exposure": 0.2727272727272727,
+        "gas_util": 0.9993691666666666,
+        "risky_rank": 0.4968340117593849,
+        "packing_ratio": 0.6733333333333333,
+        "top10_risk": 0.2,
+        "late_promo": 0.04938271604938271
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 7,
+      "shared_pool_id": 7,
+      "metrics": {
+        "block_fee": 1390.3016425012936,
+        "fairness": 0.8911913228012115,
+        "risk_exposure": 0.4375,
+        "gas_util": 0.9996958333333333,
+        "risky_rank": 0.467196132596685,
+        "packing_ratio": 0.6066666666666667,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.014084507042253521
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 8,
+      "shared_pool_id": 8,
+      "metrics": {
+        "block_fee": 1369.1830240579318,
+        "fairness": 0.8614538759018453,
+        "risk_exposure": 0.23529411764705882,
+        "gas_util": 0.9997047666666666,
+        "risky_rank": 0.34338235294117647,
+        "packing_ratio": 0.5366666666666666,
+        "top10_risk": 0.25,
+        "late_promo": 0.03125
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 9,
+      "shared_pool_id": 9,
+      "metrics": {
+        "block_fee": 1324.0190738172312,
+        "fairness": 0.8117890639856501,
+        "risk_exposure": 0.2857142857142857,
+        "gas_util": 0.9994959666666666,
+        "risky_rank": 0.32854749940177075,
+        "packing_ratio": 0.6666666666666666,
+        "top10_risk": 0.25,
+        "late_promo": 0.1125
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 10,
+      "shared_pool_id": 10,
+      "metrics": {
+        "block_fee": 1363.8536396918332,
+        "fairness": 0.8976770829579211,
+        "risk_exposure": 0.17391304347826086,
+        "gas_util": 0.9993238,
+        "risky_rank": 0.3480717268484402,
+        "packing_ratio": 0.5933333333333334,
+        "top10_risk": 0.23529411764705882,
+        "late_promo": 0.013513513513513514
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 11,
+      "shared_pool_id": 11,
+      "metrics": {
+        "block_fee": 1455.9148339864728,
+        "fairness": 0.806423560253363,
+        "risk_exposure": 0.3181818181818182,
+        "gas_util": 0.9995737,
+        "risky_rank": 0.44334975369458135,
+        "packing_ratio": 0.68,
+        "top10_risk": 0.3,
+        "late_promo": 0.025974025974025976
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 12,
+      "shared_pool_id": 12,
+      "metrics": {
+        "block_fee": 1321.082922091705,
+        "fairness": 0.7956881622481493,
+        "risk_exposure": 0.4117647058823529,
+        "gas_util": 0.9998309333333333,
+        "risky_rank": 0.36710809978441633,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.2631578947368421,
+        "late_promo": 0.06896551724137931
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 13,
+      "shared_pool_id": 13,
+      "metrics": {
+        "block_fee": 1374.6056302529603,
+        "fairness": 0.8180381776658405,
+        "risk_exposure": 0.4,
+        "gas_util": 0.9994444666666666,
+        "risky_rank": 0.40869565217391307,
+        "packing_ratio": 0.6933333333333334,
+        "top10_risk": 0.25,
+        "late_promo": 0.057971014492753624
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 14,
+      "shared_pool_id": 14,
+      "metrics": {
+        "block_fee": 1174.2358805369481,
+        "fairness": 0.8593883989545277,
+        "risk_exposure": 0.5,
+        "gas_util": 0.9995407,
+        "risky_rank": 0.334551656920078,
+        "packing_ratio": 0.5733333333333334,
+        "top10_risk": 0.5882352941176471,
+        "late_promo": 0.09090909090909091
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 15,
+      "shared_pool_id": 15,
+      "metrics": {
+        "block_fee": 1166.9810249856328,
+        "fairness": 0.8728312441162221,
+        "risk_exposure": 0.3,
+        "gas_util": 0.9993110666666667,
+        "risky_rank": 0.3308900523560209,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.2631578947368421,
+        "late_promo": 0.0136986301369863
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 16,
+      "shared_pool_id": 16,
+      "metrics": {
+        "block_fee": 1146.4698009747074,
+        "fairness": 0.8741578138480517,
+        "risk_exposure": 0.2857142857142857,
+        "gas_util": 0.9997752,
+        "risky_rank": 0.49469387755102046,
+        "packing_ratio": 0.5866666666666667,
+        "top10_risk": 0.11764705882352941,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 17,
+      "shared_pool_id": 17,
+      "metrics": {
+        "block_fee": 1543.439401293926,
+        "fairness": 0.8310710118514419,
+        "risk_exposure": 0.375,
+        "gas_util": 0.9996468666666667,
+        "risky_rank": 0.29581151832460734,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.3157894736842105,
+        "late_promo": 0.07462686567164178
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 18,
+      "shared_pool_id": 18,
+      "metrics": {
+        "block_fee": 1210.8718897732406,
+        "fairness": 0.8789018525197583,
+        "risk_exposure": 0.4375,
+        "gas_util": 0.9999939,
+        "risky_rank": 0.40625,
+        "packing_ratio": 0.57,
+        "top10_risk": 0.35294117647058826,
+        "late_promo": 0.056338028169014086
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 19,
+      "shared_pool_id": 19,
+      "metrics": {
+        "block_fee": 1390.2449009386378,
+        "fairness": 0.8560330987050434,
+        "risk_exposure": 0.3,
+        "gas_util": 0.9997297,
+        "risky_rank": 0.43058510638297864,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.013157894736842105
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 20,
+      "shared_pool_id": 20,
+      "metrics": {
+        "block_fee": 1230.802070493793,
+        "fairness": 0.9018031180019026,
+        "risk_exposure": 0.3076923076923077,
+        "gas_util": 0.9993227666666666,
+        "risky_rank": 0.32147621164962203,
+        "packing_ratio": 0.58,
+        "top10_risk": 0.4117647058823529,
+        "late_promo": 0.08860759493670886
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 21,
+      "shared_pool_id": 21,
+      "metrics": {
+        "block_fee": 1356.69529423404,
+        "fairness": 0.8498430549878083,
+        "risk_exposure": 0.3103448275862069,
+        "gas_util": 0.9993718,
+        "risky_rank": 0.4333692528735633,
+        "packing_ratio": 0.6433333333333333,
+        "top10_risk": 0.3684210526315789,
+        "late_promo": 0.014705882352941176
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 22,
+      "shared_pool_id": 22,
+      "metrics": {
+        "block_fee": 1277.7765445366028,
+        "fairness": 0.8051900855364033,
+        "risk_exposure": 0.3,
+        "gas_util": 0.9993813666666667,
+        "risky_rank": 0.2700507614213198,
+        "packing_ratio": 0.66,
+        "top10_risk": 0.2631578947368421,
+        "late_promo": 0.06329113924050633
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 23,
+      "shared_pool_id": 23,
+      "metrics": {
+        "block_fee": 1142.3995390490882,
+        "fairness": 0.9053653405272066,
+        "risk_exposure": 0.16666666666666666,
+        "gas_util": 0.9996737,
+        "risky_rank": 0.5371447028423773,
+        "packing_ratio": 0.5766666666666667,
+        "top10_risk": 0.11764705882352941,
+        "late_promo": 0.0
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 24,
+      "shared_pool_id": 24,
+      "metrics": {
+        "block_fee": 1462.1752408931166,
+        "fairness": 0.9135294095494549,
+        "risk_exposure": 0.3333333333333333,
+        "gas_util": 0.9996510333333334,
+        "risky_rank": 0.3102836879432624,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.3333333333333333,
+        "late_promo": 0.027777777777777776
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 25,
+      "shared_pool_id": 25,
+      "metrics": {
+        "block_fee": 1116.4091000765247,
+        "fairness": 0.825678417328072,
+        "risk_exposure": 0.4444444444444444,
+        "gas_util": 0.9994384,
+        "risky_rank": 0.3432650527622594,
+        "packing_ratio": 0.6,
+        "top10_risk": 0.3888888888888889,
+        "late_promo": 0.05263157894736842
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 26,
+      "shared_pool_id": 26,
+      "metrics": {
+        "block_fee": 1375.3153262367134,
+        "fairness": 0.8107786143566101,
+        "risk_exposure": 0.21739130434782608,
+        "gas_util": 0.9994234333333334,
+        "risky_rank": 0.3418131359851989,
+        "packing_ratio": 0.63,
+        "top10_risk": 0.2777777777777778,
+        "late_promo": 0.025974025974025976
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 27,
+      "shared_pool_id": 27,
+      "metrics": {
+        "block_fee": 1303.4761047080515,
+        "fairness": 0.8173929556259731,
+        "risk_exposure": 0.29411764705882354,
+        "gas_util": 0.9996266666666667,
+        "risky_rank": 0.5140271493212669,
+        "packing_ratio": 0.6533333333333333,
+        "top10_risk": 0.10526315789473684,
+        "late_promo": 0.04938271604938271
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 28,
+      "shared_pool_id": 28,
+      "metrics": {
+        "block_fee": 1493.516181562465,
+        "fairness": 0.8055983025441296,
+        "risk_exposure": 0.2777777777777778,
+        "gas_util": 0.9993417333333333,
+        "risky_rank": 0.4107905982905983,
+        "packing_ratio": 0.6966666666666667,
+        "top10_risk": 0.2,
+        "late_promo": 0.02666666666666667
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 29,
+      "shared_pool_id": 29,
+      "metrics": {
+        "block_fee": 1231.412721904973,
+        "fairness": 0.8760773757534869,
+        "risk_exposure": 0.5555555555555556,
+        "gas_util": 0.9994944,
+        "risky_rank": 0.2525839793281654,
+        "packing_ratio": 0.5766666666666667,
+        "top10_risk": 0.5294117647058824,
+        "late_promo": 0.0273972602739726
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 30,
+      "shared_pool_id": 30,
+      "metrics": {
+        "block_fee": 1272.2605905540295,
+        "fairness": 0.8597002487383971,
+        "risk_exposure": 0.42857142857142855,
+        "gas_util": 0.9995999666666666,
+        "risky_rank": 0.2873469387755102,
+        "packing_ratio": 0.5866666666666667,
+        "top10_risk": 0.47058823529411764,
+        "late_promo": 0.02564102564102564
+      }
+    },
+    {
+      "seed": 42,
+      "setting": "main",
+      "setting_value": {
+        "pool_size": 300,
+        "risk_ratio": 0.15
+      },
+      "method": "fair_fee",
+      "episode_id": 31,
+      "shared_pool_id": 31,
+      "metrics": {
+        "block_fee": 1320.7950274145792,
+        "fairness": 0.7751157428881047,
+        "risk_exposure": 0.5909090909090909,
+        "gas_util": 0.9995949333333334,
+        "risky_rank": 0.5392670157068064,
+        "packing_ratio": 0.64,
+        "top10_risk": 0.3157894736842105,
+        "late_promo": 0.08571428571428572
+      }
+    }
+  ]
+}

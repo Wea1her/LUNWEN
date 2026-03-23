@@ -915,8 +915,8 @@ def main():
         help="运行阶段。默认仅 main，可选: main robustness ablation",
     )
     parser.add_argument("--workers", type=int, default=None, help="并行进程数（默认按设备自动设置）")
-    parser.add_argument("--max-gpu-workers", type=int, default=1,
-                        help="CUDA 场景最大并行进程数（默认 1）")
+    parser.add_argument("--max-gpu-workers", type=int, default=5,
+                        help="CUDA 场景最大并行进程数（默认 5）")
     parser.add_argument("--device-map", type=str, default="",
                         help="可选 seed->device 映射，如 42:cuda:0,123:cuda:1 或 JSON 文件路径")
     parser.add_argument("--resume", action="store_true",
@@ -940,8 +940,8 @@ def main():
     if args.workers is None:
         if device.type == "cuda":
             mapped_gpu_devices = {d for d in args.device_map.values() if d.startswith("cuda")}
-            gpu_slots = len(mapped_gpu_devices) if mapped_gpu_devices else 1
-            args.workers = min(len(args.seeds), max(1, min(args.max_gpu_workers, gpu_slots)))
+            gpu_slots = len(mapped_gpu_devices) if mapped_gpu_devices else args.max_gpu_workers
+            args.workers = min(len(args.seeds), max(1, gpu_slots))
         else:
             args.workers = min(len(args.seeds), max(1, os.cpu_count() or 1))
     else:

@@ -1,0 +1,22 @@
+{
+  "seed": 42,
+  "policy_source": "trained",
+  "stages": [
+    "main",
+    "robustness",
+    "ablation"
+  ],
+  "result_dir": "results_dryrun_full/seed_42/results",
+  "status": "success",
+  "timing_seconds": {
+    "train": 242.9350326769636,
+    "eval": 9.063886235991959,
+    "robustness": 108.21190429694252,
+    "robustness_risk": 42.84676879196195,
+    "robustness_pool": 31.98658082197653,
+    "robustness_fee": 33.37855468300404,
+    "total": 360.6400591020356
+  },
+  "requested_device": "auto",
+  "resolved_device": "cuda"
+}
