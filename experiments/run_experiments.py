@@ -1,4 +1,4 @@
-"""一键实验编排: 多种子并行训练 → 评估 → 聚合 → LaTeX 表格"""
+"""一键实验编排: 多种子训练 → 评估 → 聚合 → LaTeX 表格"""
 
 from __future__ import annotations
 
@@ -898,7 +898,7 @@ def _merge_case_studies(case_study_seed_paths: list[str]) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="一键实验编排 (并行版)")
+    parser = argparse.ArgumentParser(description="一键实验编排")
     parser.add_argument("--seeds", type=int, nargs="+", default=C.SEEDS)
     parser.add_argument("--episodes", type=int, default=C.TOTAL_EPISODES)
     parser.add_argument("--eval-episodes", type=int, default=C.EVAL_EPISODES)
@@ -914,7 +914,7 @@ def main():
         default=["main"],
         help="运行阶段。默认仅 main，可选: main robustness ablation",
     )
-    parser.add_argument("--workers", type=int, default=None, help="并行进程数（默认按设备自动设置）")
+    parser.add_argument("--workers", type=int, default=None, help="并行进程数（默认 1，即串行）")
     parser.add_argument("--max-gpu-workers", type=int, default=5,
                         help="CUDA 场景最大并行进程数（默认 5）")
     parser.add_argument("--device-map", type=str, default="",
@@ -938,12 +938,7 @@ def main():
     os.makedirs(args.output, exist_ok=True)
     device = resolve_device(args.device)
     if args.workers is None:
-        if device.type == "cuda":
-            mapped_gpu_devices = {d for d in args.device_map.values() if d.startswith("cuda")}
-            gpu_slots = len(mapped_gpu_devices) if mapped_gpu_devices else args.max_gpu_workers
-            args.workers = min(len(args.seeds), max(1, gpu_slots))
-        else:
-            args.workers = min(len(args.seeds), max(1, os.cpu_count() or 1))
+        args.workers = 1
     else:
         args.workers = max(1, args.workers)
 

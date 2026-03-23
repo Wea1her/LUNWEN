@@ -12,6 +12,7 @@
 
 - 当前工作目录为仓库根目录；
 - 使用 `python` 直接运行 `experiments/run_experiments.py`；
+- 当前脚本默认 `workers=1`，即串行运行；若要恢复并行，需显式传 `--workers`；
 - 若环境尚未安装依赖，先执行：
 
 ```bash
