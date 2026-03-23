@@ -154,3 +154,12 @@
 | 执行命令 | `python experiments/run_experiments.py --stages main --seeds 42 123 456 789 2025 --episodes 3000 --eval-episodes 1000 --pool-size 300 --output results_formal_main --resume` |
 | 输出目录 | `results_formal_main/` |
 | 当前状态 | 5 个 seed 已并行进入训练阶段，正在运行中 |
+
+---
+
+
+## 十一、本次写作修订（2026-03-23，综合最优叙事版）
+
+| 文档 | 状态 | 修订内容 | 更新时间 |
+|------|------|----------|----------|
+| `plan/experiment-framework-code-change-plan-2026-03-23.md` | 已重写 | 基于最新 dry-run 结论，将改造目标从“继续强化 fairness”调整为“fairness 约束下的 risk / fee recovery”，并补充 fairness gate、terminal risk、warm-start、curriculum、constrained fee / Pareto 协议与“先改框架后调参”的实施顺序 | 2026-03-23 |
