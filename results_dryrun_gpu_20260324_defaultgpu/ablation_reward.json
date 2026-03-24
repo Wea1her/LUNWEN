@@ -1,0 +1,42 @@
+{
+  "Ours-AgeOnly": {
+    "block_fee_mean": 1723.2071268024101,
+    "block_fee_std": 0.0,
+    "fairness_mean": 0.8997056494737885,
+    "fairness_std": 0.0,
+    "risk_exposure_mean": 0.29404000886636317,
+    "risk_exposure_std": 0.0,
+    "gas_util_mean": 0.9996520416666667,
+    "gas_util_std": 0.0
+  },
+  "Ours-Age+Risk": {
+    "block_fee_mean": 1813.1513405690546,
+    "block_fee_std": 0.0,
+    "fairness_mean": 0.8553353613304977,
+    "fairness_std": 0.0,
+    "risk_exposure_mean": 0.1949004872210306,
+    "risk_exposure_std": 0.0,
+    "gas_util_mean": 0.9993876322916667,
+    "gas_util_std": 0.0
+  },
+  "Ours-Age+TerminalFair": {
+    "block_fee_mean": 1806.2330806011355,
+    "block_fee_std": 0.0,
+    "fairness_mean": 0.858694592698866,
+    "fairness_std": 0.0,
+    "risk_exposure_mean": 0.21677568580642875,
+    "risk_exposure_std": 0.0,
+    "gas_util_mean": 0.9993489770833334,
+    "gas_util_std": 0.0
+  },
+  "Ours-FullBalanced": {
+    "block_fee_mean": 1604.5665648624404,
+    "block_fee_std": 0.0,
+    "fairness_mean": 0.9238858037512175,
+    "fairness_std": 0.0,
+    "risk_exposure_mean": 0.234891825283512,
+    "risk_exposure_std": 0.0,
+    "gas_util_mean": 0.9997484291666667,
+    "gas_util_std": 0.0
+  }
+}

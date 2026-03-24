@@ -1,0 +1,22 @@
+{
+  "seed": 42,
+  "policy_source": "trained",
+  "stages": [
+    "main",
+    "robustness",
+    "ablation"
+  ],
+  "result_dir": "results_dryrun_gpu_20260324_defaultgpu/seed_42/results",
+  "status": "success",
+  "timing_seconds": {
+    "train": 294.59179712296464,
+    "eval": 11.93234623101307,
+    "robustness": 131.7874791540671,
+    "robustness_risk": 52.60033749003196,
+    "robustness_pool": 35.9825796050136,
+    "robustness_fee": 43.204562059021555,
+    "total": 438.7631054610247
+  },
+  "requested_device": "cuda:0",
+  "resolved_device": "cuda:0"
+}

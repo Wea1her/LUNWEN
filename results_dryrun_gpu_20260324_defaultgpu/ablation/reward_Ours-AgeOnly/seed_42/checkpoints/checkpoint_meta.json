@@ -1,0 +1,91 @@
+{
+  "formal_eval_checkpoint": "best_model.pt",
+  "formal_eval_rule": "best_fixed_validation_pool_metric",
+  "best_checkpoint": "best_model.pt",
+  "final_checkpoint": "final_model.pt",
+  "selection_rule": {
+    "type": "fixed_validation_pool",
+    "validation_metric": "hypervolume",
+    "higher_is_better": true,
+    "validation_episodes": 64,
+    "validation_interval": 50,
+    "validation_seed": 10042,
+    "validation_pool_file": "validation_pools.json",
+    "validation_fairness_floor": 0.9,
+    "validation_oldest_coverage_floor": 0.9,
+    "validation_risk_ceil": 0.3,
+    "validation_top10_risk_ceil": 0.3,
+    "best_episode": 150,
+    "best_metric_key": "hypervolume_proxy",
+    "best_metric_value": 0.29215984237806314,
+    "best_selection_score": 0.29215984237806314
+  },
+  "warmstart": {
+    "policy": "mixed",
+    "epochs": 1,
+    "episodes_per_epoch": 4,
+    "history": [
+      {
+        "epoch": 1,
+        "policy": "mixed",
+        "bc_loss": 4.341850757598877,
+        "steps": 771
+      }
+    ]
+  },
+  "curriculum": {
+    "enabled": true,
+    "stage_episode_cuts": [
+      0.3,
+      0.7,
+      1.0
+    ],
+    "stage_switches": [
+      {
+        "episode": 46,
+        "stage": 2
+      },
+      {
+        "episode": 106,
+        "stage": 3
+      }
+    ]
+  },
+  "multi_checkpoints": {
+    "fairness_recovery": {
+      "file": "best_fairness_recovery.pt",
+      "best_score": 1.3394823150687842,
+      "best_episode": 100
+    },
+    "risk_aligned": {
+      "file": "best_risk_aligned.pt",
+      "best_score": 0.6791422923660897,
+      "best_episode": 50
+    },
+    "constrained_fee": {
+      "file": "best_constrained_fee.pt",
+      "best_score": 0.4997064604622448,
+      "best_episode": 50
+    },
+    "hypervolume": {
+      "file": "best_hypervolume.pt",
+      "best_score": 0.45100324789076857,
+      "best_episode": 150
+    }
+  },
+  "training_proxy_metrics": [
+    "proxy_block_fee",
+    "proxy_fairness",
+    "proxy_risk_exposure",
+    "proxy_gas_util",
+    "proxy_age_reward",
+    "proxy_oldest_cover",
+    "proxy_terminal_fair_reward",
+    "proxy_starvation_penalty",
+    "proxy_terminal_risk_penalty",
+    "proxy_packing_reward",
+    "proxy_unused_gas_penalty",
+    "proxy_fairness_gate"
+  ],
+  "reward_eval_note": "Training reward is a proxy objective; formal reporting metrics are computed by the shared metric pipeline in evaluation."
+}
