@@ -437,9 +437,9 @@ def main():
     parser.add_argument("--risk-ratio", type=float, default=C.RISK_RATIO)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=str, default="results")
-    parser.add_argument("--device", type=str, default="auto",
-                        choices=["auto", "cpu", "cuda", "cuda:0"],
-                        help="评估设备: auto/cpu/cuda/cuda:0")
+    parser.add_argument("--device", type=str, default="cuda:0",
+                        choices=["cpu", "cuda", "cuda:0"],
+                        help="评估设备: 默认 cuda:0；可手动指定 cpu/cuda")
     parser.add_argument("--robustness", action="store_true",
                         help="运行鲁棒性实验")
     parser.add_argument("--plot", action="store_true",

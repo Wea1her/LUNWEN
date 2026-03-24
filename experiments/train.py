@@ -52,9 +52,20 @@ def _run_validation(model: ActorCritic,
         fee_norm = float(agg.get("block_fee_norm_mean", 0.0))
         fairness = float(np.clip(agg.get("fairness_mean", 0.0), 0.0, 1.0))
         risk = float(np.clip(agg.get("risk_exposure_mean", 1.0), 0.0, 1.0))
+        top10_risk = float(np.clip(agg.get("top10_risk_mean", 1.0), 0.0, 1.0))
         oldest_cov = float(np.clip(agg.get("oldest_coverage_mean", 0.0), 0.0, 1.0))
         metric_key = "hypervolume_proxy"
-        metric_value = fee_norm * fairness * (1.0 - risk) * oldest_cov
+        metric_value = fee_norm * fairness * (1.0 - risk) * (1.0 - top10_risk) * oldest_cov
+        score = metric_value
+    elif args.val_metric == "pareto_score":
+        # 轻量 Pareto proxy：鼓励收益/公平/oldest 覆盖，不允许高风险与高top10_risk。
+        fee_norm = float(np.clip(agg.get("block_fee_norm_mean", 0.0), 0.0, 1.0))
+        fairness = float(np.clip(agg.get("fairness_mean", 0.0), 0.0, 1.0))
+        oldest = float(np.clip(agg.get("oldest_coverage_mean", 0.0), 0.0, 1.0))
+        risk = float(np.clip(agg.get("risk_exposure_mean", 1.0), 0.0, 1.0))
+        top10 = float(np.clip(agg.get("top10_risk_mean", 1.0), 0.0, 1.0))
+        metric_key = "pareto_proxy"
+        metric_value = 0.3 * fee_norm + 0.25 * fairness + 0.25 * oldest + 0.1 * (1.0 - risk) + 0.1 * (1.0 - top10)
         score = metric_value
     else:
         metric_key = f"{args.val_metric}_mean"
@@ -504,8 +515,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--log-interval", type=int, default=C.LOG_INTERVAL)
     parser.add_argument("--output", type=str, default="checkpoints")
-    parser.add_argument("--device", type=str, default="auto",
-                        help="训练设备: auto/cpu/cuda/cuda:0/cuda:1...")
+    parser.add_argument("--device", type=str, default="cuda:0",
+                        help="训练设备: 默认 cuda:0，可手动指定 cpu/cuda/cuda:1 ...")
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)

@@ -30,9 +30,10 @@ from metrics import (compute_all_metrics, constrained_success_score,
 from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, generate_composite_table,
                           generate_fairness_decomp_table, generate_constrained_main_table,
-                          generate_pareto_main_table, ABLATION_ORDER,
+                          generate_pareto_main_table, generate_protocol_ablation_table,
+                          ABLATION_ORDER, PROTOCOL_ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
-                          STRUCT_ABLATION_LABELS)
+                          STRUCT_ABLATION_LABELS, PROTOCOL_ABLATION_LABELS)
 from method_registry import MAIN_METHOD_ORDER, get_baseline_method_ids, normalize_method_id
 from stat_tests import (SCIPY_AVAILABLE, run_paired_significance_tests,
                         format_paired_significance_table,
@@ -641,10 +642,83 @@ STRUCT_ABLATION_CONFIGS = {
     "Ours-Full":      {"no_seq_summary": False, "no_stop": False, "no_action_mask": False},
 }
 
+PROTOCOL_ABLATION_CONFIGS = {
+    "Proto-Composite-NoWarm-NoCurr": {
+        "env_kwargs": {},
+        "train_overrides": {
+            "val_metric": "composite_score",
+            "pretrain_policy": "none",
+            "pretrain_epochs": 0,
+            "curriculum": False,
+        },
+    },
+    "Proto-Constrained-NoWarm-NoCurr": {
+        "env_kwargs": {},
+        "train_overrides": {
+            "val_metric": "constrained_fee",
+            "pretrain_policy": "none",
+            "pretrain_epochs": 0,
+            "curriculum": False,
+        },
+    },
+    "Proto-Constrained-Warm-Curr": {
+        "env_kwargs": {},
+        "train_overrides": {
+            "val_metric": "constrained_fee",
+            "pretrain_policy": "mixed",
+            "pretrain_epochs": 1,
+            "curriculum": True,
+        },
+    },
+    "Proto-Constrained-NoFairGate": {
+        "env_kwargs": {
+            "fairness_gate_type": "hard",
+            "fairness_gate_min": 1.0,
+        },
+        "train_overrides": {
+            "val_metric": "constrained_fee",
+            "pretrain_policy": "mixed",
+            "pretrain_epochs": 1,
+            "curriculum": True,
+        },
+    },
+    "Proto-Constrained-NoTerminalRisk": {
+        "env_kwargs": {
+            "terminal_risk_exposure_weight": 0.0,
+            "terminal_top10_risk_weight": 0.0,
+            "terminal_risky_rank_dev_weight": 0.0,
+        },
+        "train_overrides": {
+            "val_metric": "constrained_fee",
+            "pretrain_policy": "mixed",
+            "pretrain_epochs": 1,
+            "curriculum": True,
+        },
+    },
+    "Proto-Hypervolume-Warm-Curr": {
+        "env_kwargs": {},
+        "train_overrides": {
+            "val_metric": "hypervolume",
+            "pretrain_policy": "mixed",
+            "pretrain_epochs": 1,
+            "curriculum": True,
+        },
+    },
+}
 
-def _train_ablation_single(name, seed, args_dict, env_kwargs, shared_pool_path=None):
+
+def _train_ablation_single(
+    name,
+    seed,
+    args_dict,
+    env_kwargs=None,
+    train_overrides=None,
+    shared_pool_path=None,
+):
     """单个消融变体+种子的训练与评估 (独立进程)"""
     args = argparse.Namespace(**args_dict)
+    env_kwargs = dict(env_kwargs or {})
+    train_overrides = dict(train_overrides or {})
     if isinstance(getattr(args, "device_map", None), dict) and seed in args.device_map:
         args.device = args.device_map[seed]
     device = resolve_device(args.device)
@@ -657,27 +731,29 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs, shared_pool_path=N
     if not args.skip_train:
         print(f"  [Ablation] {name} seed={seed} 开始训练", flush=True)
         seed_everything(seed)
-        train_args = argparse.Namespace(
-            episodes=args.episodes,
-            pool_size=args.pool_size,
-            risk_ratio=C.RISK_RATIO,
-            seed=seed,
-            log_interval=C.LOG_INTERVAL,
-            output=ckpt_dir,
-            device=args.device,
-            val_episodes=args.val_episodes,
-            val_interval=args.val_interval,
-            val_metric=args.val_metric,
-            val_fairness_floor=args.val_fairness_floor,
-            val_oldest_coverage_floor=args.val_oldest_coverage_floor,
-            val_risk_ceil=args.val_risk_ceil,
-            val_top10_risk_ceil=args.val_top10_risk_ceil,
-            pretrain_policy=args.pretrain_policy,
-            pretrain_epochs=args.pretrain_epochs,
-            pretrain_episodes_per_epoch=args.pretrain_episodes_per_epoch,
-            curriculum=args.curriculum,
-            curriculum_stage_episodes=args.curriculum_stage_episodes,
-        )
+        train_args_dict = {
+            "episodes": args.episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": C.RISK_RATIO,
+            "seed": seed,
+            "log_interval": C.LOG_INTERVAL,
+            "output": ckpt_dir,
+            "device": args.device,
+            "val_episodes": args.val_episodes,
+            "val_interval": args.val_interval,
+            "val_metric": args.val_metric,
+            "val_fairness_floor": args.val_fairness_floor,
+            "val_oldest_coverage_floor": args.val_oldest_coverage_floor,
+            "val_risk_ceil": args.val_risk_ceil,
+            "val_top10_risk_ceil": args.val_top10_risk_ceil,
+            "pretrain_policy": args.pretrain_policy,
+            "pretrain_epochs": args.pretrain_epochs,
+            "pretrain_episodes_per_epoch": args.pretrain_episodes_per_epoch,
+            "curriculum": args.curriculum,
+            "curriculum_stage_episodes": args.curriculum_stage_episodes,
+        }
+        train_args_dict.update(train_overrides)
+        train_args = argparse.Namespace(**train_args_dict)
         train_model(train_args, env_kwargs=env_kwargs)
         print(f"  [Ablation] {name} seed={seed} 训练完成", flush=True)
 
@@ -709,10 +785,24 @@ def _train_ablation_single(name, seed, args_dict, env_kwargs, shared_pool_path=N
     return name, seed, result
 
 
-def run_ablation_parallel(configs, args, label_prefix):
+def run_ablation_parallel(configs, args, label_prefix, metrics=None):
     """并行运行消融实验"""
-    metrics = ["block_fee", "fairness", "risk_exposure", "gas_util"]
+    if metrics is None:
+        metrics = ["block_fee", "fairness", "risk_exposure", "gas_util"]
     args_dict = vars(args)
+    parsed_configs = {}
+    for name, config in configs.items():
+        if isinstance(config, dict) and ("env_kwargs" in config or "train_overrides" in config):
+            parsed_configs[name] = {
+                "env_kwargs": dict(config.get("env_kwargs", {})),
+                "train_overrides": dict(config.get("train_overrides", {})),
+            }
+        else:
+            parsed_configs[name] = {
+                "env_kwargs": dict(config or {}),
+                "train_overrides": {},
+            }
+
     shared_pool_dir = os.path.join(args.output, "ablation", "shared_pools")
     os.makedirs(shared_pool_dir, exist_ok=True)
     shared_pool_paths = {}
@@ -728,22 +818,23 @@ def run_ablation_parallel(configs, args, label_prefix):
         })
         shared_pool_paths[seed] = shared_pool_path
 
-    max_workers = max(1, min(args.workers, len(configs) * len(args.seeds)))
+    max_workers = max(1, min(args.workers, len(parsed_configs) * len(args.seeds)))
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {}
-        for name, env_kwargs in configs.items():
+        for name, config_payload in parsed_configs.items():
             for seed in args.seeds:
                 fut = executor.submit(
                     _train_ablation_single,
                     f"{label_prefix}_{name}",
                     seed,
                     args_dict,
-                    env_kwargs,
+                    config_payload["env_kwargs"],
+                    config_payload["train_overrides"],
                     shared_pool_paths[seed],
                 )
                 futures[fut] = (name, seed)
 
-        results = {name: [] for name in configs}
+        results = {name: [] for name in parsed_configs}
         failures = []
         for fut in as_completed(futures):
             orig_name, seed = futures[fut]
@@ -759,7 +850,7 @@ def run_ablation_parallel(configs, args, label_prefix):
                 print(f"  [Ablation] {orig_name} seed={seed} 失败: {exc}", flush=True)
 
     agg = {}
-    for name in configs:
+    for name in parsed_configs:
         agg[name] = {}
         for metric in metrics:
             vals = [r[f"{metric}_mean"] for r in results[name]]
@@ -1161,10 +1252,12 @@ def main():
     parser.add_argument("--episodes", type=int, default=C.TOTAL_EPISODES)
     parser.add_argument("--eval-episodes", type=int, default=C.EVAL_EPISODES)
     parser.add_argument("--pool-size", type=C.validate_pool_size, default=C.POOL_SIZE_DEFAULT)
-    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output", type=str, default="results_final")
     parser.add_argument("--skip-train", action="store_true", help="跳过训练, 仅评估已有模型")
     parser.add_argument("--ablation", action="store_true", help="兼容参数: 在 stages 中追加 ablation")
+    parser.add_argument("--protocol-ablation", action="store_true",
+                        help="在 ablation 阶段额外运行协议消融并输出 table_protocol_ablation.tex")
     parser.add_argument(
         "--stages",
         nargs="+",
@@ -1227,6 +1320,7 @@ def main():
     print(f"Workers: {args.workers}")
     print(f"Resume: {args.resume}")
     print(f"Skip existing: {args.skip_existing}")
+    print(f"Protocol ablation: {args.protocol_ablation}")
     print(f"Episodes: {args.episodes}")
     print(f"Pool size: {args.pool_size}")
     print(f"Baselines: {args.baseline_methods}")
@@ -1256,6 +1350,7 @@ def main():
         "allow_random_fallback": args.allow_random_fallback,
         "resume": args.resume,
         "skip_existing": args.skip_existing,
+        "protocol_ablation": args.protocol_ablation,
         "workers": args.workers,
         "device": str(device),
         "device_map": {str(k): v for k, v in args.device_map.items()},
@@ -1283,6 +1378,7 @@ def main():
     seed_timings = {}
     ablation_reward_seconds = 0.0
     ablation_struct_seconds = 0.0
+    ablation_protocol_seconds = 0.0
 
     if set(args.stages) & {"main", "robustness"}:
         seeds_to_run = []
@@ -1547,6 +1643,38 @@ def main():
         run_summary["outputs"]["ablation_struct_table"] = os.path.basename(st_path)
         print(f"消融表格已保存: {rw_path}, {st_path}")
 
+        if args.protocol_ablation:
+            print("\n===== 协议消融实验 =====", flush=True)
+            t_abl_protocol = time.perf_counter()
+            agg_protocol_abl = run_ablation_parallel(
+                PROTOCOL_ABLATION_CONFIGS,
+                args,
+                "protocol",
+                metrics=[
+                    "block_fee",
+                    "fairness",
+                    "risk_exposure",
+                    "top10_risk",
+                    "composite_score",
+                    "constrained_fee_score",
+                    "risk_adjusted_fee_score",
+                ],
+            )
+            ablation_protocol_seconds = time.perf_counter() - t_abl_protocol
+            protocol_tex = generate_protocol_ablation_table(
+                agg_protocol_abl,
+                PROTOCOL_ABLATION_ORDER,
+                PROTOCOL_ABLATION_LABELS,
+            )
+            protocol_tex_path = os.path.join(args.output, "table_protocol_ablation.tex")
+            with open(protocol_tex_path, "w") as f:
+                f.write(protocol_tex)
+            protocol_json_path = os.path.join(args.output, "ablation_protocol.json")
+            _write_json(protocol_json_path, agg_protocol_abl)
+            run_summary["outputs"]["ablation_protocol_json"] = os.path.basename(protocol_json_path)
+            run_summary["outputs"]["ablation_protocol_table"] = os.path.basename(protocol_tex_path)
+            print(f"协议消融表格已保存: {protocol_tex_path}")
+
     timing_payload = {
         "timestamp": datetime.now().isoformat(),
         "seed_timings": seed_timings,
@@ -1556,6 +1684,7 @@ def main():
             "robustness": float(sum(t.get("robustness", 0.0) for t in seed_timings.values())),
             "ablation_reward": float(ablation_reward_seconds),
             "ablation_struct": float(ablation_struct_seconds),
+            "ablation_protocol": float(ablation_protocol_seconds),
         },
         "total_runtime_seconds": float(time.perf_counter() - run_start),
     }

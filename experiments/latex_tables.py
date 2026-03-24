@@ -20,6 +20,23 @@ STRUCT_ABLATION_LABELS = {
     "Ours-Full": "完整模型（本文）",
 }
 
+PROTOCOL_ABLATION_ORDER = [
+    "Proto-Composite-NoWarm-NoCurr",
+    "Proto-Constrained-NoWarm-NoCurr",
+    "Proto-Constrained-Warm-Curr",
+    "Proto-Constrained-NoFairGate",
+    "Proto-Constrained-NoTerminalRisk",
+    "Proto-Hypervolume-Warm-Curr",
+]
+PROTOCOL_ABLATION_LABELS = {
+    "Proto-Composite-NoWarm-NoCurr": "Composite选模 + 无Warm/Curr",
+    "Proto-Constrained-NoWarm-NoCurr": "Constrained选模 + 无Warm/Curr",
+    "Proto-Constrained-Warm-Curr": "Constrained选模 + Warm/Curr",
+    "Proto-Constrained-NoFairGate": "Constrained选模 + 去FairnessGate",
+    "Proto-Constrained-NoTerminalRisk": "Constrained选模 + 去TerminalRisk",
+    "Proto-Hypervolume-Warm-Curr": "Hypervolume选模 + Warm/Curr",
+}
+
 
 def _fmt(mean, std, precision=2):
     return f"${mean:.{precision}f} \\pm {std:.{precision}f}$"
@@ -196,6 +213,32 @@ def generate_pareto_main_table(dominance_matrix: dict, anchor_method: str = "our
         non = f"${rel.get('non_dominated_rate', 0.0):.4f}$"
         n_pairs = rel.get("n_pairs", 0)
         lines.append(f"{latex_name(anchor_method)} vs {latex_name(method_id)} & {dom} & {back} & {non} & ${n_pairs}$ \\\\")
+    return "\n".join(lines) + "\n"
+
+
+def generate_protocol_ablation_table(agg: dict, order=None, labels=None) -> str:
+    """生成协议消融表。"""
+    if order is None:
+        order = PROTOCOL_ABLATION_ORDER
+    if labels is None:
+        labels = PROTOCOL_ABLATION_LABELS
+    metrics = [
+        ("block_fee", 1),
+        ("fairness", 4),
+        ("risk_exposure", 4),
+        ("top10_risk", 4),
+        ("constrained_fee_score", 4),
+        ("risk_adjusted_fee_score", 4),
+        ("composite_score", 4),
+    ]
+    present = [m for m in order if m in agg]
+    lines = []
+    for m in present:
+        d = agg[m]
+        cells = [labels.get(m, m)]
+        for met, prec in metrics:
+            cells.append(_fmt(d.get(f"{met}_mean", 0.0), d.get(f"{met}_std", 0.0), prec))
+        lines.append(" & ".join(cells) + " \\\\")
     return "\n".join(lines) + "\n"
 
 
