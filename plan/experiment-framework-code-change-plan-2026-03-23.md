@@ -1,4 +1,9 @@
-# 实验框架代码改动文档（2026-03-23，基于最新 dry-run 复核版）
+# 实验框架代码改动文档（2026-03-24，基于最新 dry-run 复核版）
+
+> 本次更新（2026-03-24）聚焦一个执行性问题：  
+> **当前阶段“先改实验代码框架还是先调参”？**
+>
+> 结论：**先框架、后调参**，建议投入比例约为 **70% 框架机制改造 / 30% 参数精修**。
 
 ## 1. 文档目标
 
@@ -8,6 +13,12 @@
 2. **本文方法在预注册的多目标 / 约束式评估协议下，具备冲击综合最优的能力，而不是只在单一分项指标上占优。**
 
 最新 dry-run 已经表明：框架当前阶段的主要瓶颈不是“fairness 拉不起来”，而是 **fairness 已恢复后，risk 与 fee recovery 仍未同步到位**。因此，本轮改造的重点应该从“继续放大公平性 shaping”转向“**把 fairness 从持续主驱动改造成阶段性约束，并在此基础上回补 risk 与 fee**”。
+
+并进一步落实为三条优先级（按实施顺序）：
+
+1. **优先改选模/验证协议**：让训练阶段 checkpoint 选择直接惩罚 `top10_risk`，而不是仅靠 `risk_exposure`；
+2. **优先改风险口径对齐**：强化终局 risk 项在 reward 与日志中的地位，确保与论文口径一致；
+3. **最后做调参**：在新协议下再扫 `gamma_r / terminal risk weights / fairness gate`。
 
 ---
 
@@ -438,6 +449,12 @@ r_T = \omega_{fair}(\beta_T r_{fair}^{terminal}-\gamma_s r_{starvation}) - \lamb
 
 这些都属于**框架缺口**，不是简单调 `beta` 与 `gamma` 能补齐的。
 
+为避免执行歧义，本轮明确采用以下决策规则：
+
+- 若问题表现为“指标口径不一致”（例如训练优化 `risk_exposure`，但论文结论受 `top10_risk` 卡住），归类为**框架问题**；
+- 若问题表现为“同口径下仅数值略差”，再归类为**调参问题**；
+- 当前 FIFO / Fee-Risk-Linear 压制我方风险指标，主要属于第一类，因此先改框架。
+
 ### 5.2 调参应在何时介入
 
 调参应在以下条件满足后介入：
@@ -462,23 +479,28 @@ r_T = \omega_{fair}(\beta_T r_{fair}^{terminal}-\gamma_s r_{starvation}) - \lamb
 
 > **先改框架，后调参；先做机制对齐，再做参数精修。**
 
+补充执行比例建议：
+
+- **阶段一（机制改造期）**：约 70% 人力投入在 `train.py / metrics.py / env.py` 的协议与口径对齐；
+- **阶段二（参数精修期）**：约 30% 人力投入在阈值、权重与 PPO 训练超参数搜索。
+
 ---
 
 ## 6. 推荐实施顺序（修订版）
 
-### P0：先修综合最优的根因
+### P0：先修综合最优的根因（优先改“协议”）
 
-1. [ ] 在 `env.py` 中加入 fairness gate。
-2. [ ] 在 `env.py` 中加入终局 risk 对齐项。
-3. [ ] 在 `env.py` 中加入 packing / fee recovery / unused gas 项。
-4. [ ] 在 `train.py` 中补 warm-start 与 curriculum。
-5. [ ] 在 `train.py` 中加入多 checkpoint 协议。
+1. [ ] 在 `train.py` 中将验证协议升级为 risk-aware（`top10_risk` 参与选模或硬约束）。
+2. [ ] 在 `metrics.py` 中将 `top10_risk` 纳入主协议分数（或新增并行主分数），避免仅靠 `risk_exposure`。
+3. [ ] 在 `train.py` 中加入多 checkpoint 协议（`best_risk_aligned.pt` / `best_hypervolume.pt` / `best_constrained_fee.pt`）。
+4. [ ] 在 `env.py` 中加入/强化 fairness gate 与终局 risk 对齐项。
+5. [ ] 在 `env.py` 中补足 packing / fee recovery / unused gas 项并统一日志字段。
 
-### P1：再修正式协议
+### P1：再修训练稳定性与可迁移性
 
-6. [ ] 在 `metrics.py` 中加入 constrained score / Pareto 指标。
-7. [ ] 在 `evaluate.py` 中补 feasible-region / dominance 输出。
-8. [ ] 在 `run_experiments.py` 中加入 `fairness_recovery_track` 与 `composite_optimal_track`。
+6. [ ] 在 `train.py` 中补 warm-start 与 curriculum。
+7. [ ] 在 `run_experiments.py` 中固化 `fairness_recovery_track` 与 `composite_optimal_track` 的 CLI 模板。
+8. [ ] 在 `evaluate.py` 中补 feasible-region / dominance 输出，保证协议证据可直接落表。
 
 ### P2：再做状态增强
 
