@@ -1,0 +1,9 @@
+{
+  "block_fee_mean": "ours",
+  "fairness_mean": "fifo",
+  "risk_exposure_mean": "fee_risk_linear",
+  "top10_risk_mean": "heuristic",
+  "packing_ratio_mean": "ours",
+  "composite_score_mean": "ours",
+  "constrained_fee_score_mean": "fifo"
+}

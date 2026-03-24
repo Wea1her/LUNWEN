@@ -1,0 +1,14 @@
+{
+  "version": "v20260324_narrative_package",
+  "required_keys": [
+    "table_main_core",
+    "table_main_fullmetrics",
+    "table_main_constraints",
+    "narrative_guard"
+  ],
+  "missing_keys": [],
+  "report_incomplete": false,
+  "evidence_level": "dryrun_single_seed",
+  "score_policy_version": "v20260324_narrative_aligned",
+  "ranking_policy_version": "tiered_feasible_rate_then_feasible_fee"
+}
