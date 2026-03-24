@@ -77,6 +77,12 @@ def generate_main_table(agg: dict) -> str:
         ("risky_rank", 4, None),  # 接近 0.5 最好, 特殊处理
         ("packing_ratio", 4, True),
     ]
+    return _generate_metric_table(agg, metrics)
+
+
+def _generate_metric_table(agg: dict, metrics: list[tuple[str, int, bool | None]]) -> str:
+    """通用指标表生成器。"""
+    agg = _normalize_method_keyed_dict(agg)
 
     present = [m for m in MAIN_METHOD_ORDER if m in agg]
 
@@ -110,6 +116,47 @@ def generate_main_table(agg: dict) -> str:
             cells.append(col[row_idx])
         lines.append(" & ".join(cells) + " \\\\")
     return "\n".join(lines) + "\n"
+
+
+def generate_main_core_table(agg: dict) -> str:
+    """主叙事核心表（收益-公平-风险-约束）。"""
+    metrics = [
+        ("block_fee", 1, True),
+        ("fairness", 4, True),
+        ("risk_exposure", 4, False),
+        ("top10_risk", 4, False),
+        ("gas_util", 4, True),
+        ("packing_ratio", 4, True),
+        ("composite_score", 4, True),
+        ("constrained_fee_score", 4, True),
+    ]
+    return _generate_metric_table(agg, metrics)
+
+
+def generate_main_fullmetrics_table(agg: dict) -> str:
+    """全指标主表（防止选择性呈现）。"""
+    metrics = [
+        ("block_fee", 1, True),
+        ("fairness", 4, True),
+        ("risk_exposure", 4, False),
+        ("edge_risk_ratio", 4, False),
+        ("top10_risk", 4, False),
+        ("risky_rank", 4, None),
+        ("gas_util", 4, True),
+        ("packing_ratio", 4, True),
+        ("late_promo", 4, True),
+        ("oldest_coverage", 4, True),
+        ("starvation_gap", 4, False),
+        ("tail_wait_reduction", 4, True),
+        ("selected_wait_std", 4, False),
+        ("wait_p95", 4, False),
+        ("wait_p99", 4, False),
+        ("wait_gini", 4, False),
+        ("composite_score", 4, True),
+        ("constrained_fee_score", 4, True),
+        ("risk_adjusted_fee_score", 4, True),
+    ]
+    return _generate_metric_table(agg, metrics)
 
 
 def generate_robustness_table(agg_rob: dict) -> str:
@@ -191,10 +238,23 @@ def generate_constrained_main_table(payload: dict) -> str:
     for method_id in present:
         v = methods[method_id]
         feas = f"${v.get('feasible_rate', 0.0):.4f}$"
-        cmean = f"${v.get('constrained_fee_mean', -1.0):.4f}$"
-        cstd = f"${v.get('constrained_fee_std', 0.0):.4f}$"
-        lines.append(f"{latex_name(method_id)} & {feas} & {cmean} & {cstd} \\\\")
+        cmean_raw = v.get("feasible_fee_mean", v.get("constrained_fee_mean"))
+        cstd_raw = v.get("feasible_fee_std", v.get("constrained_fee_std"))
+        cmean = "--" if cmean_raw is None else f"${float(cmean_raw):.4f}$"
+        cstd = "--" if cstd_raw is None else f"${float(cstd_raw):.4f}$"
+        infeasible = int(v.get("infeasible_count", 0))
+        top1 = str(v.get("constraint_violation_top1", "none")).replace("_", r"\_")
+        lines.append(
+            f"{latex_name(method_id)} & {feas} & {cmean} & {cstd} & ${infeasible}$ & {top1} \\\\"
+        )
     return "\n".join(lines) + "\n"
+
+
+def append_exploratory_note(table_rows: str, evidence_level: str) -> str:
+    """在 dryrun/exploratory 情况下追加表注。"""
+    if evidence_level == "formal_multi_seed":
+        return table_rows
+    return table_rows + f"% NOTE: This table is exploratory ({evidence_level}).\n"
 
 
 def generate_pareto_main_table(dominance_matrix: dict, anchor_method: str = "ours") -> str:

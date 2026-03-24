@@ -7,12 +7,12 @@ import config as C
 from transaction import Transaction
 
 
-def _apply_nonce_order(txs: List[Transaction]) -> List[Transaction]:
+def _apply_nonce_order(txs: List[Transaction], block_gas_limit: int | None = None) -> List[Transaction]:
     """保证同地址交易按 nonce 顺序, 在原有排序基础上做拓扑修正"""
     selected: List[Transaction] = []
     remaining = list(txs)
     selected_nonces: dict[int, int] = {}  # sender -> max selected nonce
-    gas_left = C.MAX_BLOCK_GAS
+    gas_left = int(block_gas_limit) if block_gas_limit is not None else C.effective_block_gas_limit(len(txs))
 
     while remaining:
         progress = False
@@ -43,13 +43,13 @@ def _apply_nonce_order(txs: List[Transaction]) -> List[Transaction]:
 def fifo_sort(pool: List[Transaction]) -> List[Transaction]:
     """按到达时间排序"""
     ordered = sorted(pool, key=lambda tx: tx.arrival_time)
-    return _apply_nonce_order(ordered)
+    return _apply_nonce_order(ordered, C.effective_block_gas_limit(len(pool)))
 
 
 def gas_priority_sort(pool: List[Transaction]) -> List[Transaction]:
     """按手续费从高到低排序"""
     ordered = sorted(pool, key=lambda tx: -tx.fee)
-    return _apply_nonce_order(ordered)
+    return _apply_nonce_order(ordered, C.effective_block_gas_limit(len(pool)))
 
 
 def heuristic_sort(pool: List[Transaction],
@@ -69,7 +69,7 @@ def heuristic_sort(pool: List[Transaction],
         result.insert(mid, tx)
         mid += 1
 
-    return _apply_nonce_order(result)
+    return _apply_nonce_order(result, C.effective_block_gas_limit(len(pool)))
 
 
 def fee_risk_linear_sort(pool: List[Transaction],
@@ -83,7 +83,7 @@ def fee_risk_linear_sort(pool: List[Transaction],
     ordered = sorted(pool,
                      key=lambda tx: -(lambda_f * (tx.fee / max_fee)
                                       - lambda_r * tx.risk_score))
-    return _apply_nonce_order(ordered)
+    return _apply_nonce_order(ordered, C.effective_block_gas_limit(len(pool)))
 
 
 def fair_fee_sort(pool: List[Transaction],
@@ -101,7 +101,7 @@ def fair_fee_sort(pool: List[Transaction],
     ordered = sorted(pool,
                      key=lambda tx: -(lambda_f * (tx.fee / max_fee)
                                       + lambda_w * ((t_now - tx.arrival_time) / t_max)))
-    return _apply_nonce_order(ordered)
+    return _apply_nonce_order(ordered, C.effective_block_gas_limit(len(pool)))
 
 
 def center_aware_greedy_sort(
@@ -142,7 +142,7 @@ def center_aware_greedy_sort(
     for tx in risky:
         result.insert(mid, tx)
         mid += 1
-    return _apply_nonce_order(result)
+    return _apply_nonce_order(result, C.effective_block_gas_limit(len(pool)))
 
 
 def run_baseline(pool: List[Transaction],

@@ -112,7 +112,8 @@ class TxOrderingEnv(gym.Env):
         self._pool: list[Transaction] = []
         self._candidates: list[Transaction] = []
         self._selected: list[Transaction] = []
-        self._remaining_gas = C.MAX_BLOCK_GAS
+        self._block_gas_limit = C.MAX_BLOCK_GAS
+        self._remaining_gas = self._block_gas_limit
         self._acc_fee = 0.0
         self._step_count = 0
         self._t_now = 0.0
@@ -162,7 +163,8 @@ class TxOrderingEnv(gym.Env):
     def _reset_from_current_pool(self) -> dict:
         self._candidates = list(self._pool)
         self._selected = []
-        self._remaining_gas = C.MAX_BLOCK_GAS
+        self._block_gas_limit = C.effective_block_gas_limit(len(self._pool))
+        self._remaining_gas = self._block_gas_limit
         self._acc_fee = 0.0
         self._step_count = 0
         self._done = False
@@ -376,6 +378,18 @@ class TxOrderingEnv(gym.Env):
         risky = sum(1 for tx in top if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD)
         return risky / n_top
 
+    def _edge_risk_ratio_selected(self) -> float:
+        if not self._selected:
+            return 0.0
+        k = len(self._selected)
+        n_edge = max(int(k * C.RISK_POSITION_RATIO), 1)
+        idx = set(range(n_edge)) | set(range(max(k - n_edge, 0), k))
+        sensitive = [self._selected[i] for i in idx]
+        if not sensitive:
+            return 0.0
+        risky_sensitive = sum(1 for tx in sensitive if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD)
+        return risky_sensitive / len(sensitive)
+
     def _avg_risky_rank_selected(self) -> float:
         if len(self._selected) <= 1:
             return 0.5
@@ -420,13 +434,13 @@ class TxOrderingEnv(gym.Env):
 
         # 平滑风险位置惩罚
         avg_gas = sum(item.gas for item in self._pool) / max(len(self._pool), 1)
-        est_block_size = max(int(C.MAX_BLOCK_GAS / avg_gas), 1) if avg_gas > 0 else len(self._pool)
+        est_block_size = max(int(self._block_gas_limit / avg_gas), 1) if avg_gas > 0 else len(self._pool)
         pos_ratio = self._step_count / max(est_block_size - 1, 1)
         r_risk = tx.risk_score * self._risk_position_penalty(pos_ratio)
         fairness_gate = self._fairness_gate()
 
         # packing 激励（弱项，避免主导训练）
-        r_packing = tx.gas / C.MAX_BLOCK_GAS
+        r_packing = tx.gas / max(self._block_gas_limit, 1)
 
         # late-high-fee recovery（仅作弱激励，并按风险折减）
         is_late_high = (tx.arrival_time > self._median_arrival) and (tx.fee > self._median_fee)
@@ -468,7 +482,7 @@ class TxOrderingEnv(gym.Env):
         oldest_wait_mass = self._oldest_wait_mass_norm()
         packing_ratio = len(self._selected) / max(len(self._pool), 1)
         packing_gap = 1.0 - packing_ratio
-        unused_gas_ratio = self._remaining_gas / C.MAX_BLOCK_GAS
+        unused_gas_ratio = self._remaining_gas / max(self._block_gas_limit, 1)
         late_high_unserved = self._late_high_fee_unserved_ratio()
         remaining_fee_mass_norm = self._remaining_fee_mass_norm()
 
@@ -509,7 +523,9 @@ class TxOrderingEnv(gym.Env):
             + self.terminal_top10_risk_weight * terminal_top10_risk
             + self.terminal_risky_rank_dev_weight * terminal_risky_rank_dev
         )
-        unused_gas_penalty = -self.unused_gas_penalty_weight * (self._remaining_gas / C.MAX_BLOCK_GAS)
+        unused_gas_penalty = -self.unused_gas_penalty_weight * (
+            self._remaining_gas / max(self._block_gas_limit, 1)
+        )
 
         self._proxy_terminal_fair += terminal_fair_contrib
         self._proxy_starvation_penalty += starvation_penalty
@@ -579,6 +595,7 @@ class TxOrderingEnv(gym.Env):
     def _risk_block_summary(self) -> np.ndarray:
         selected_top10_risk_ratio = self._top10_risk_ratio_selected()
         risk_exposure_selected = self._risk_exposure_selected()
+        selected_edge_risk_ratio = self._edge_risk_ratio_selected()
         selected_risky_rank_mean = self._avg_risky_rank_selected()
 
         if self._candidates:
@@ -596,6 +613,7 @@ class TxOrderingEnv(gym.Env):
         return np.array([
             selected_top10_risk_ratio,
             risk_exposure_selected,
+            selected_edge_risk_ratio,
             selected_risky_rank_mean,
             remaining_risky_oldest_overlap_ratio,
             late_high_fee_unserved_ratio,
@@ -609,7 +627,7 @@ class TxOrderingEnv(gym.Env):
             features[i] = tx.feature_vector(self._max_fee, self._max_gas, self._t_max)
 
         # 区块基础状态
-        rem_gas_norm = self._remaining_gas / C.MAX_BLOCK_GAS
+        rem_gas_norm = self._remaining_gas / max(self._block_gas_limit, 1)
         n_sel_norm = len(self._selected) / max(len(self._pool), 1)
         acc_fee_norm = self._acc_fee / (self._max_fee * max(len(self._pool), 1))
 
@@ -661,12 +679,31 @@ class TxOrderingEnv(gym.Env):
         }
 
     def _info(self) -> dict[str, Any]:
+        if self._selected:
+            waits = np.array([self._wait(tx) for tx in self._selected], dtype=np.float64)
+            wait_p95 = float(np.quantile(waits, 0.95))
+            wait_p99 = float(np.quantile(waits, 0.99))
+            mean_wait = float(np.mean(waits))
+            if mean_wait < 1e-12:
+                wait_gini = 0.0
+            else:
+                diff = np.abs(waits[:, None] - waits[None, :])
+                wait_gini = float(diff.mean() / (2.0 * mean_wait))
+        else:
+            wait_p95 = 0.0
+            wait_p99 = 0.0
+            wait_gini = 0.0
+
         return {
             "selected": [tx.tid for tx in self._selected],
             "total_fee": self._acc_fee,
-            "gas_used": C.MAX_BLOCK_GAS - self._remaining_gas,
+            "gas_used": self._block_gas_limit - self._remaining_gas,
+            "block_gas_limit": self._block_gas_limit,
             "num_selected": len(self._selected),
             "pool_size": len(self._pool),
+            "wait_p95": wait_p95,
+            "wait_p99": wait_p99,
+            "wait_gini": wait_gini,
             "reward_decomposition": {
                 "fee_reward": self._proxy_fee_reward,
                 "age_reward": self._proxy_age_reward,

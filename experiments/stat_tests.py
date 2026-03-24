@@ -6,6 +6,7 @@ import json
 import numpy as np
 from typing import Optional
 
+import config as C
 from method_registry import MAIN_METHOD_ORDER, display_name, normalize_method_id
 
 try:
@@ -149,6 +150,7 @@ def run_significance_tests(
 
     normalized_main = [_normalize_method_results(m) for m in all_main]
     baselines = [k for k in normalized_main[0].keys() if k != ours_key]
+    exploratory_only = len(normalized_main) < int(getattr(C, "EVIDENCE_FORMAL_MIN_SEEDS", 3))
     results = {}
 
     for bl in baselines:
@@ -170,7 +172,8 @@ def run_significance_tests(
                 "ci_baseline_95": ci_bl,
                 "ours_mean": float(np.mean(ours_vals)),
                 "baseline_mean": float(np.mean(bl_vals)),
-                "significant": tt["p_value"] < 0.05,
+                "significant": (tt["p_value"] < 0.05) and (not exploratory_only),
+                "exploratory_only": exploratory_only,
             }
 
     return results
@@ -231,6 +234,8 @@ def run_paired_significance_tests(
     for row in paired_rows.values():
         methods_present.update(row.keys())
     baselines = [m for m in MAIN_METHOD_ORDER if m != ours_key and m in methods_present]
+    seed_set = {k[0] for k in paired_rows.keys() if k[0] is not None}
+    exploratory_only = len(seed_set) < int(getattr(C, "EVIDENCE_FORMAL_MIN_SEEDS", 3))
 
     results: dict[str, dict] = {}
     for bl in baselines:
@@ -245,6 +250,10 @@ def run_paired_significance_tests(
                 bl_metric = row[bl].get(metric)
                 if ours_metric is None or bl_metric is None:
                     continue
+                if metric == "constrained_fee_score":
+                    # 仅在可行子集上比较，避免不可行占位值污染统计。
+                    if float(ours_metric) < 0.0 or float(bl_metric) < 0.0:
+                        continue
                 ours_vals.append(float(ours_metric))
                 bl_vals.append(float(bl_metric))
 
@@ -261,6 +270,7 @@ def run_paired_significance_tests(
                     "mean_diff": 0.0,
                     "significant_t": False,
                     "significant_wilcoxon": False,
+                    "exploratory_only": exploratory_only,
                 }
                 continue
 
@@ -279,8 +289,9 @@ def run_paired_significance_tests(
                 "ours_mean": float(np.mean(ours_vals)),
                 "baseline_mean": float(np.mean(bl_vals)),
                 "mean_diff": float(np.mean(diff)),
-                "significant_t": tt["p_value"] < 0.05,
-                "significant_wilcoxon": wx["p_value"] < 0.05,
+                "significant_t": (tt["p_value"] < 0.05) and (not exploratory_only),
+                "significant_wilcoxon": (wx["p_value"] < 0.05) and (not exploratory_only),
+                "exploratory_only": exploratory_only,
             }
 
     return results

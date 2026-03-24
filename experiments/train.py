@@ -220,9 +220,16 @@ def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
     )
     return {
         "fairness_recovery": fairness + 0.4 * oldest - 0.2 * starvation,
-        "risk_aligned": fairness - 0.8 * risk - 0.3 * top10,
+        # 显式纳入 top10_risk，避免仅靠 risk_exposure 选模。
+        "risk_aligned": fairness - 0.8 * risk - 0.5 * top10,
         "constrained_fee": constrained_fee,
-        "hypervolume": fee_norm * max(fairness, 0.0) * max(1.0 - risk, 0.0) * max(oldest, 1e-6),
+        "hypervolume": (
+            fee_norm
+            * max(fairness, 0.0)
+            * max(1.0 - risk, 0.0)
+            * max(1.0 - top10, 0.0)
+            * max(oldest, 1e-6)
+        ),
     }
 
 

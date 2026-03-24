@@ -25,12 +25,14 @@ from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
                       build_fairness_decomposition,
                       plot_training_curve)
 from baselines import run_baseline
-from metrics import (compute_all_metrics, constrained_success_score,
-                     pareto_dominates)
+from metrics import (compute_all_metrics, constrained_ranking, pareto_dominates,
+                     summary_metric_bundle)
 from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, generate_composite_table,
                           generate_fairness_decomp_table, generate_constrained_main_table,
+                          generate_main_core_table, generate_main_fullmetrics_table,
                           generate_pareto_main_table, generate_protocol_ablation_table,
+                          append_exploratory_note,
                           ABLATION_ORDER, PROTOCOL_ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS, PROTOCOL_ABLATION_LABELS)
@@ -893,6 +895,58 @@ def _apply_track_defaults(args):
         args.val_top10_risk_ceil = min(args.val_top10_risk_ceil, 0.30)
 
 
+def _infer_evidence_level(seed_runs: list[dict]) -> str:
+    seed_set = {
+        int(item.get("seed"))
+        for item in seed_runs
+        if item.get("seed") is not None and item.get("status") in {"success", "resumed", "skipped_existing"}
+    }
+    n = len(seed_set)
+    if n <= 1:
+        return "dryrun_single_seed"
+    if n < int(getattr(C, "EVIDENCE_FORMAL_MIN_SEEDS", 3)):
+        return "multi_seed_exploratory"
+    return "formal_multi_seed"
+
+
+def _metric_winner_by_dimension(agg_main: dict) -> dict:
+    specs = [
+        ("block_fee_mean", True),
+        ("fairness_mean", True),
+        ("risk_exposure_mean", False),
+        ("top10_risk_mean", False),
+        ("packing_ratio_mean", True),
+        ("composite_score_mean", True),
+        ("constrained_fee_score_mean", True),
+    ]
+    winner_map = {}
+    for metric, higher in specs:
+        cand = [(m, d.get(metric)) for m, d in agg_main.items() if metric in d]
+        if not cand:
+            continue
+        ordered = sorted(cand, key=lambda kv: kv[1], reverse=higher)
+        winner_map[metric] = ordered[0][0]
+    return winner_map
+
+
+def _build_narrative_guard(agg_main: dict | None) -> dict:
+    if not agg_main:
+        return {
+            "guard_version": "v20260324",
+            "can_claim_all_dimensions_best": False,
+            "blocking_reasons": ["missing_aggregated_main"],
+            "metric_winner_by_dimension": {},
+        }
+    winners = _metric_winner_by_dimension(agg_main)
+    non_ours = [m for m, winner in winners.items() if winner != "ours"]
+    return {
+        "guard_version": "v20260324",
+        "can_claim_all_dimensions_best": len(non_ours) == 0,
+        "blocking_reasons": [f"ours_not_best_on_{m}" for m in non_ours],
+        "metric_winner_by_dimension": winners,
+    }
+
+
 def _collect_git_commit() -> str | None:
     try:
         return subprocess.check_output(
@@ -1099,6 +1153,9 @@ def _build_fairness_decomposition_from_rows(main_episode_rows: list[dict], basel
         "starvation_gap",
         "tail_wait_reduction",
         "selected_wait_std",
+        "wait_p95",
+        "wait_p99",
+        "wait_gini",
         "composite_score",
     ]
     payload = {
@@ -1134,34 +1191,43 @@ def _build_constrained_eval_summary_from_rows(
         "risk_ceil": args.val_risk_ceil,
         "top10_risk_ceil": args.val_top10_risk_ceil,
     }
-    payload = {"constraints": constraints, "methods": {}}
+    payload = {
+        "score_policy_version": C.SCORE_POLICY_VERSION,
+        "ranking_policy_version": C.RANKING_POLICY_VERSION,
+        "constraints": constraints,
+        "methods": {},
+    }
     for method_id in ["ours", *baseline_methods]:
-        vals = []
+        metrics_seq = []
         for row in main_episode_rows:
             if row.get("setting", "main") != "main" or row.get("method") != method_id:
                 continue
-            metrics = row.get("metrics", {})
-            vals.append(
-                constrained_success_score(
-                    metrics,
-                    constraints=constraints,
-                    target_metric="block_fee_norm",
-                )
-            )
-        feasible = [v for v in vals if v > -1.0 + 1e-12]
+            metrics_seq.append(row.get("metrics", {}))
+        bundle = summary_metric_bundle(
+            metrics_seq,
+            constraints=constraints,
+            target_metric="block_fee_norm",
+        )
         payload["methods"][method_id] = {
-            "feasible_rate": (len(feasible) / len(vals)) if vals else 0.0,
-            "constrained_fee_mean": float(np.mean(feasible)) if feasible else -1.0,
-            "constrained_fee_std": float(np.std(feasible)) if feasible else 0.0,
-            "infeasible_count": len(vals) - len(feasible),
-            "n_episodes": len(vals),
+            "feasible_rate": bundle["feasible_rate"],
+            "feasible_fee_mean": bundle["feasible_set_fee_mean"],
+            "feasible_fee_std": bundle["feasible_set_fee_std"],
+            # backward compatibility
+            "constrained_fee_mean": bundle["feasible_set_fee_mean"],
+            "constrained_fee_std": bundle["feasible_set_fee_std"],
+            "all_episode_fee_mean": bundle["all_episode_fee_mean"],
+            "all_episode_fee_std": bundle["all_episode_fee_std"],
+            "risk_adjusted_fee_mean": bundle["risk_adjusted_fee_mean"],
+            "risk_adjusted_fee_std": bundle["risk_adjusted_fee_std"],
+            "infeasible_count": bundle["infeasible_count"],
+            "n_episodes": bundle["n_episodes"],
+            "violation_breakdown": bundle["violation_breakdown"],
+            "constraint_violation_top1": bundle["constraint_violation_top1"],
         }
-    ranked = sorted(
-        payload["methods"].items(),
-        key=lambda kv: (kv[1]["feasible_rate"], kv[1]["constrained_fee_mean"]),
-        reverse=True,
+    payload["ranking"] = constrained_ranking(
+        payload["methods"],
+        min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
     )
-    payload["ranking"] = [name for name, _ in ranked]
     return payload
 
 
@@ -1487,6 +1553,8 @@ def main():
                         flush=True,
                     )
 
+    run_summary["evidence_level"] = _infer_evidence_level(run_summary["seed_runs"])
+
     agg_main, agg_rob_risk, agg_rob_pool, agg_rob_fee = aggregate_across_seeds(
         all_main=all_main if "main" in args.stages else None,
         all_rob_risk=all_rob_risk if "robustness" in args.stages else None,
@@ -1499,18 +1567,41 @@ def main():
         _write_json(agg_main_path, agg_main)
         run_summary["outputs"]["aggregated_main"] = os.path.basename(agg_main_path)
 
-        t2 = generate_main_table(agg_main)
+        t2 = append_exploratory_note(generate_main_table(agg_main), run_summary["evidence_level"])
         t2_path = os.path.join(args.output, "table2_content.tex")
         with open(t2_path, "w") as f:
             f.write(t2)
         run_summary["outputs"]["table2"] = os.path.basename(t2_path)
 
+        core_table = append_exploratory_note(
+            generate_main_core_table(agg_main),
+            run_summary["evidence_level"],
+        )
+        core_table_path = os.path.join(args.output, "table_main_core.tex")
+        with open(core_table_path, "w") as f:
+            f.write(core_table)
+        run_summary["outputs"]["table_main_core"] = os.path.basename(core_table_path)
+
+        full_table = append_exploratory_note(
+            generate_main_fullmetrics_table(agg_main),
+            run_summary["evidence_level"],
+        )
+        full_table_path = os.path.join(args.output, "table_main_fullmetrics.tex")
+        with open(full_table_path, "w") as f:
+            f.write(full_table)
+        run_summary["outputs"]["table_main_fullmetrics"] = os.path.basename(full_table_path)
+
         table_composite = generate_composite_table(agg_main)
         if table_composite:
             table_composite_path = os.path.join(args.output, "table_composite_main.tex")
             with open(table_composite_path, "w") as f:
-                f.write(table_composite)
+                f.write(append_exploratory_note(table_composite, run_summary["evidence_level"]))
             run_summary["outputs"]["table_composite_main"] = os.path.basename(table_composite_path)
+
+        winner_payload = _metric_winner_by_dimension(agg_main)
+        winner_path = os.path.join(args.output, "metric_winner_by_dimension.json")
+        _write_json(winner_path, winner_payload)
+        run_summary["outputs"]["metric_winner_by_dimension"] = os.path.basename(winner_path)
 
     if "robustness" in args.stages and agg_rob_risk and agg_rob_pool and agg_rob_fee:
         agg_rob_risk_path = os.path.join(args.output, "aggregated_robustness_risk.json")
@@ -1530,11 +1621,11 @@ def main():
         t3_pool_path = os.path.join(args.output, "table3_pool_content.tex")
         t3_fee_path = os.path.join(args.output, "table3_fee_content.tex")
         with open(t3_risk_path, "w") as f:
-            f.write(t3_risk)
+            f.write(append_exploratory_note(t3_risk, run_summary["evidence_level"]))
         with open(t3_pool_path, "w") as f:
-            f.write(t3_pool)
+            f.write(append_exploratory_note(t3_pool, run_summary["evidence_level"]))
         with open(t3_fee_path, "w") as f:
-            f.write(t3_fee)
+            f.write(append_exploratory_note(t3_fee, run_summary["evidence_level"]))
         run_summary["outputs"]["table3_risk"] = os.path.basename(t3_risk_path)
         run_summary["outputs"]["table3_pool"] = os.path.basename(t3_pool_path)
         run_summary["outputs"]["table3_fee"] = os.path.basename(t3_fee_path)
@@ -1557,7 +1648,7 @@ def main():
             fairness_tex = generate_fairness_decomp_table(fairness_decomp)
             fairness_tex_path = os.path.join(args.output, "table_fairness_decomp.tex")
             with open(fairness_tex_path, "w") as f:
-                f.write(fairness_tex)
+                f.write(append_exploratory_note(fairness_tex, run_summary["evidence_level"]))
             run_summary["outputs"]["table_fairness_decomp"] = os.path.basename(fairness_tex_path)
 
             constrained_summary = _build_constrained_eval_summary_from_rows(
@@ -1571,8 +1662,12 @@ def main():
             constrained_tex = generate_constrained_main_table(constrained_summary)
             constrained_tex_path = os.path.join(args.output, "table_constrained_main.tex")
             with open(constrained_tex_path, "w") as f:
-                f.write(constrained_tex)
+                f.write(append_exploratory_note(constrained_tex, run_summary["evidence_level"]))
             run_summary["outputs"]["table_constrained_main"] = os.path.basename(constrained_tex_path)
+            table_constraints_path = os.path.join(args.output, "table_main_constraints.tex")
+            with open(table_constraints_path, "w") as f:
+                f.write(append_exploratory_note(constrained_tex, run_summary["evidence_level"]))
+            run_summary["outputs"]["table_main_constraints"] = os.path.basename(table_constraints_path)
 
             pareto_episode, dominance_matrix = _build_pareto_outputs_from_rows(
                 main_episode_rows,
@@ -1587,7 +1682,7 @@ def main():
             pareto_tex = generate_pareto_main_table(dominance_matrix, anchor_method="ours")
             pareto_tex_path = os.path.join(args.output, "table_pareto_main.tex")
             with open(pareto_tex_path, "w") as f:
-                f.write(pareto_tex)
+                f.write(append_exploratory_note(pareto_tex, run_summary["evidence_level"]))
             run_summary["outputs"]["table_pareto_main"] = os.path.basename(pareto_tex_path)
 
         merged_case_study = _merge_case_studies(case_study_seed_paths)
@@ -1605,6 +1700,12 @@ def main():
                 _write_json(sig_path, sig)
                 sig_tex = os.path.join(args.output, "table_significance_paired.tex")
                 generate_paired_significance_latex(sig, sig_tex)
+                if run_summary["evidence_level"] != "formal_multi_seed":
+                    with open(sig_tex, "a") as f:
+                        f.write(
+                            f"% NOTE: Exploratory evidence ({run_summary['evidence_level']}); "
+                            "do not claim formal superiority.\n"
+                        )
                 run_summary["outputs"]["paired_significance_json"] = os.path.basename(sig_path)
                 run_summary["outputs"]["paired_significance_table"] = os.path.basename(sig_tex)
             else:
@@ -1622,7 +1723,7 @@ def main():
         t_rw = generate_ablation_table(agg_reward_abl, ABLATION_ORDER, ABLATION_LABELS)
         rw_path = os.path.join(args.output, "table_ablation_reward.tex")
         with open(rw_path, "w") as f:
-            f.write(t_rw)
+            f.write(append_exploratory_note(t_rw, run_summary["evidence_level"]))
         abl_rw_json = os.path.join(args.output, "ablation_reward.json")
         _write_json(abl_rw_json, agg_reward_abl)
 
@@ -1633,7 +1734,7 @@ def main():
         t_st = generate_ablation_table(agg_struct_abl, STRUCT_ABLATION_ORDER, STRUCT_ABLATION_LABELS)
         st_path = os.path.join(args.output, "table_ablation_struct.tex")
         with open(st_path, "w") as f:
-            f.write(t_st)
+            f.write(append_exploratory_note(t_st, run_summary["evidence_level"]))
         abl_st_json = os.path.join(args.output, "ablation_struct.json")
         _write_json(abl_st_json, agg_struct_abl)
 
@@ -1668,12 +1769,37 @@ def main():
             )
             protocol_tex_path = os.path.join(args.output, "table_protocol_ablation.tex")
             with open(protocol_tex_path, "w") as f:
-                f.write(protocol_tex)
+                f.write(append_exploratory_note(protocol_tex, run_summary["evidence_level"]))
             protocol_json_path = os.path.join(args.output, "ablation_protocol.json")
             _write_json(protocol_json_path, agg_protocol_abl)
             run_summary["outputs"]["ablation_protocol_json"] = os.path.basename(protocol_json_path)
             run_summary["outputs"]["ablation_protocol_table"] = os.path.basename(protocol_tex_path)
             print(f"协议消融表格已保存: {protocol_tex_path}")
+
+    narrative_guard = _build_narrative_guard(agg_main if "main" in args.stages else None)
+    narrative_guard_path = os.path.join(args.output, "narrative_guard.json")
+    _write_json(narrative_guard_path, narrative_guard)
+    run_summary["outputs"]["narrative_guard"] = os.path.basename(narrative_guard_path)
+
+    required_for_main_story = [
+        "table_main_core",
+        "table_main_fullmetrics",
+        "table_main_constraints",
+        "narrative_guard",
+    ]
+    missing = [k for k in required_for_main_story if k not in run_summary["outputs"]]
+    outputs_manifest = {
+        "version": "v20260324_narrative_package",
+        "required_keys": required_for_main_story,
+        "missing_keys": missing,
+        "report_incomplete": len(missing) > 0,
+        "evidence_level": run_summary.get("evidence_level", "unknown"),
+        "score_policy_version": C.SCORE_POLICY_VERSION,
+        "ranking_policy_version": C.RANKING_POLICY_VERSION,
+    }
+    outputs_manifest_path = os.path.join(args.output, "outputs_manifest.json")
+    _write_json(outputs_manifest_path, outputs_manifest)
+    run_summary["outputs"]["outputs_manifest"] = os.path.basename(outputs_manifest_path)
 
     timing_payload = {
         "timestamp": datetime.now().isoformat(),

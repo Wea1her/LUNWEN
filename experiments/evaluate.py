@@ -12,8 +12,8 @@ import config as C
 from env import TxOrderingEnv
 from networks import ActorCritic
 from baselines import run_baseline
-from metrics import (compute_all_metrics, constrained_success_score,
-                     pareto_dominance_rate, pareto_dominates)
+from metrics import (compute_all_metrics, constrained_ranking, pareto_dominance_rate,
+                     pareto_dominates, summary_metric_bundle)
 from device_utils import resolve_device
 from method_registry import BASELINE_METHOD_IDS, display_name
 from transaction import Transaction, generate_pool
@@ -130,6 +130,9 @@ def build_fairness_decomposition(raw: dict[str, list[dict]]) -> dict:
         "starvation_gap",
         "tail_wait_reduction",
         "selected_wait_std",
+        "wait_p95",
+        "wait_p99",
+        "wait_gini",
         "composite_score",
     ]
     payload = {
@@ -158,27 +161,33 @@ def build_constrained_eval_summary(raw: dict[str, list[dict]],
         "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,
     }
     payload = {
+        "score_policy_version": C.SCORE_POLICY_VERSION,
+        "ranking_policy_version": C.RANKING_POLICY_VERSION,
         "constraints": cons,
         "methods": {},
     }
     for method, seq in raw.items():
-        constrained_scores = [
-            constrained_success_score(metrics, constraints=cons, target_metric="block_fee_norm")
-            for metrics in seq
-        ]
-        feasible = [s for s in constrained_scores if s > -1.0 + 1e-12]
+        bundle = summary_metric_bundle(seq, constraints=cons, target_metric="block_fee_norm")
         payload["methods"][method] = {
-            "feasible_rate": (len(feasible) / len(constrained_scores)) if constrained_scores else 0.0,
-            "constrained_fee_mean": float(np.mean(feasible)) if feasible else -1.0,
-            "constrained_fee_std": float(np.std(feasible)) if feasible else 0.0,
-            "infeasible_count": len(constrained_scores) - len(feasible),
+            "feasible_rate": bundle["feasible_rate"],
+            "feasible_fee_mean": bundle["feasible_set_fee_mean"],
+            "feasible_fee_std": bundle["feasible_set_fee_std"],
+            # 兼容旧字段名
+            "constrained_fee_mean": bundle["feasible_set_fee_mean"],
+            "constrained_fee_std": bundle["feasible_set_fee_std"],
+            "all_episode_fee_mean": bundle["all_episode_fee_mean"],
+            "all_episode_fee_std": bundle["all_episode_fee_std"],
+            "risk_adjusted_fee_mean": bundle["risk_adjusted_fee_mean"],
+            "risk_adjusted_fee_std": bundle["risk_adjusted_fee_std"],
+            "infeasible_count": bundle["infeasible_count"],
+            "n_episodes": bundle["n_episodes"],
+            "violation_breakdown": bundle["violation_breakdown"],
+            "constraint_violation_top1": bundle["constraint_violation_top1"],
         }
-    ranked = sorted(
-        payload["methods"].items(),
-        key=lambda kv: (kv[1]["feasible_rate"], kv[1]["constrained_fee_mean"]),
-        reverse=True,
+    payload["ranking"] = constrained_ranking(
+        payload["methods"],
+        min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
     )
-    payload["ranking"] = [name for name, _ in ranked]
     return payload
 
 
@@ -250,6 +259,26 @@ def print_table(all_results: dict[str, dict]):
               f"{agg.get('risky_rank_mean', 0.5):>8.4f} "
               f"{agg.get('packing_ratio_mean', 0.0):>8.4f} "
               f"{agg.get('composite_score_mean', 0.0):>8.4f}")
+
+
+def metric_winner_by_dimension(all_results: dict[str, dict]) -> dict:
+    specs = [
+        ("block_fee_mean", True),
+        ("fairness_mean", True),
+        ("risk_exposure_mean", False),
+        ("top10_risk_mean", False),
+        ("packing_ratio_mean", True),
+        ("composite_score_mean", True),
+        ("constrained_fee_score_mean", True),
+    ]
+    out = {}
+    for metric, higher in specs:
+        cand = [(k, v.get(metric)) for k, v in all_results.items() if metric in v]
+        if not cand:
+            continue
+        ordered = sorted(cand, key=lambda kv: kv[1], reverse=higher)
+        out[metric] = ordered[0][0]
+    return out
 
 
 def run_robustness(model, device, n_episodes, pool_size, seed,
@@ -522,6 +551,8 @@ def main():
                 {"pool_size": args.pool_size, "risk_ratio": args.risk_ratio},
             ),
         }, f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "metric_winner_by_dimension.json"), "w") as f:
+        json.dump(metric_winner_by_dimension(all_results), f, indent=2, ensure_ascii=False)
     with open(os.path.join(args.output, "fairness_decomposition.json"), "w") as f:
         json.dump(
             build_fairness_decomposition(raw_results),

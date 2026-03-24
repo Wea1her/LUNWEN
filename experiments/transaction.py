@@ -44,12 +44,33 @@ def generate_pool(rng: np.random.Generator,
     return _generate_pool_correlated_v1(rng, pool_size, risk_ratio)
 
 
+def _resolve_profile_multipliers() -> tuple[float, float]:
+    """返回 (congestion_mult, gas_mult) 场景倍率。"""
+    profile = str(getattr(C, "SCENARIO_PROFILE", "default")).lower()
+    if profile == "light":
+        return 0.85, 0.90
+    if profile == "heavy":
+        return 1.20, 1.20
+    return 1.0, 1.0
+
+
+def _small_pool_stress_active(pool_size: int) -> bool:
+    return bool(
+        getattr(C, "SMALL_POOL_STRESS_MODE", False)
+        and pool_size <= int(getattr(C, "SMALL_POOL_STRESS_THRESHOLD", 120))
+    )
+
+
 def _generate_pool_iid(rng: np.random.Generator,
                        pool_size: int | None = None,
                        risk_ratio: float = C.RISK_RATIO) -> List[Transaction]:
     """旧版独立采样交易池（保留作为对照）。"""
     if pool_size is None:
         pool_size = rng.integers(C.POOL_SIZE_MIN, C.POOL_SIZE_MAX + 1)
+    cong_mult, gas_mult = _resolve_profile_multipliers()
+    if _small_pool_stress_active(int(pool_size)):
+        cong_mult *= float(getattr(C, "SMALL_POOL_STRESS_CONGESTION_MULT", 1.35))
+        gas_mult *= float(getattr(C, "SMALL_POOL_STRESS_GAS_MULT", 1.45))
 
     # 决定每笔交易是否为风险交易
     is_risk = rng.random(pool_size) < risk_ratio
@@ -67,15 +88,20 @@ def _generate_pool_iid(rng: np.random.Generator,
         sender_nonce_counter[s] = nonces[i] + 1
 
     # 到达时间: 泊松过程累积
-    intervals = rng.exponential(1.0 / C.ARRIVAL_RATE, size=pool_size)
+    intervals = rng.exponential(1.0 / max(C.ARRIVAL_RATE * cong_mult, 1e-6), size=pool_size)
     arrivals = np.cumsum(intervals)
 
     txs: List[Transaction] = []
     for i in range(pool_size):
         # 交易类型
-        tx_type = 1 if rng.random() < 0.6 else 0  # 60% 合约调用
+        contract_prob = _clip01(0.6 + 0.1 * (gas_mult - 1.0))
+        tx_type = 1 if rng.random() < contract_prob else 0  # 默认约 60% 合约调用
         gas = C.GAS_TRANSFER if tx_type == 0 else int(
-            rng.integers(C.GAS_CONTRACT_MIN, C.GAS_CONTRACT_MAX + 1))
+            rng.integers(
+                max(int(C.GAS_CONTRACT_MIN * gas_mult), C.GAS_CONTRACT_MIN),
+                max(int(C.GAS_CONTRACT_MAX * gas_mult), C.GAS_CONTRACT_MIN + 1) + 1,
+            )
+        )
 
         # 手续费
         fee = float(rng.lognormal(C.FEE_LOG_MEAN, C.FEE_LOG_STD))
@@ -119,6 +145,10 @@ def _generate_pool_correlated_v1(rng: np.random.Generator,
     """
     if pool_size is None:
         pool_size = int(rng.integers(C.POOL_SIZE_MIN, C.POOL_SIZE_MAX + 1))
+    cong_mult, gas_mult = _resolve_profile_multipliers()
+    if _small_pool_stress_active(int(pool_size)):
+        cong_mult *= float(getattr(C, "SMALL_POOL_STRESS_CONGESTION_MULT", 1.35))
+        gas_mult *= float(getattr(C, "SMALL_POOL_STRESS_GAS_MULT", 1.45))
 
     # 市场拥堵强度（按片段波动），用于耦合 arrival / risk / fee
     segment_len = max(pool_size // 10, 8)
@@ -126,6 +156,7 @@ def _generate_pool_correlated_v1(rng: np.random.Generator,
     segment_count = int(np.ceil(pool_size / segment_len))
     segment_ids = np.repeat(np.arange(segment_count), segment_len)[:pool_size]
     market_levels = rng.choice(levels, size=segment_count, p=[0.25, 0.5, 0.25])
+    market_levels = market_levels * cong_mult
     market_state = market_levels[segment_ids]
 
     # 风险标签概率与拥堵状态相关
@@ -152,10 +183,15 @@ def _generate_pool_correlated_v1(rng: np.random.Generator,
     txs: List[Transaction] = []
     for i in range(pool_size):
         congest = float(market_state[i] - 1.0)  # [-0.25, 0.35] 附近
-        tx_type_contract_prob = _clip01(0.58 + 0.08 * congest + (0.06 if is_risk[i] else -0.03))
+        tx_type_contract_prob = _clip01(
+            0.58 + 0.08 * congest + (0.06 if is_risk[i] else -0.03) + 0.06 * (gas_mult - 1.0)
+        )
         tx_type = 1 if rng.random() < tx_type_contract_prob else 0
         gas = C.GAS_TRANSFER if tx_type == 0 else int(
-            rng.integers(C.GAS_CONTRACT_MIN, C.GAS_CONTRACT_MAX + 1)
+            rng.integers(
+                max(int(C.GAS_CONTRACT_MIN * gas_mult), C.GAS_CONTRACT_MIN),
+                max(int(C.GAS_CONTRACT_MAX * gas_mult), C.GAS_CONTRACT_MIN + 1) + 1,
+            )
         )
 
         if is_risk[i]:

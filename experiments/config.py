@@ -16,6 +16,12 @@ RISK_SCORE_LOW = (0.0, 0.3)  # 普通交易评分范围
 ARRIVAL_RATE = 1.0           # 泊松到达率 (笔/秒)
 RISK_FEE_MULTIPLIER = 2.0    # 风险交易手续费倍率
 POOL_REALISM_MODE = "correlated_v1"  # 交易池生成模式: iid_baseline / correlated_v1
+SCENARIO_PROFILE = "default"  # light / default / heavy
+SMALL_POOL_STRESS_MODE = True
+SMALL_POOL_STRESS_THRESHOLD = 120
+SMALL_POOL_STRESS_CONGESTION_MULT = 1.35
+SMALL_POOL_STRESS_GAS_MULT = 1.45
+SMALL_POOL_STRESS_GAS_LIMIT_MULT = 0.65
 
 # ========== 奖励函数 ==========
 ALPHA = 1.0   # 手续费收益权重
@@ -56,7 +62,7 @@ TX_FEATURE_DIM = 8       # 交易原始特征维度
 HIDDEN_DIM = 128         # 隐藏层维度
 BLOCK_BASE_DIM = 3       # rem_gas / selected_ratio / acc_fee
 BLOCK_FAIRNESS_SUMMARY_DIM = 9
-BLOCK_RISK_SUMMARY_DIM = 5
+BLOCK_RISK_SUMMARY_DIM = 6
 BLOCK_SEQ_SUMMARY_DIM = HIDDEN_DIM
 BLOCK_STATE_DIM = (
     BLOCK_BASE_DIM
@@ -93,17 +99,20 @@ COMPOSITE_W_OLDEST_COVERAGE = 0.15
 RISK_ADJUSTED_FEE_LAMBDA = 0.40
 VALIDATION_EPISODES = 64
 VALIDATION_INTERVAL = 50
-VALIDATION_METRIC = "composite_score"
+VALIDATION_METRIC = "hypervolume"
 LOWER_IS_BETTER_METRICS = ("risk_exposure", "starvation_gap", "top10_risk")
-VALIDATION_FAIRNESS_FLOOR = 0.0
-VALIDATION_RISK_CEIL = 1.0
-VALIDATION_OLDEST_COVERAGE_FLOOR = 0.0
-VALIDATION_TOP10_RISK_CEIL = 1.0
+VALIDATION_FAIRNESS_FLOOR = 0.90
+VALIDATION_RISK_CEIL = 0.30
+VALIDATION_OLDEST_COVERAGE_FLOOR = 0.90
+VALIDATION_TOP10_RISK_CEIL = 0.30
 VALIDATION_SEED_OFFSET = 10000
 BEST_CHECKPOINT_NAME = "best_model.pt"
 FINAL_CHECKPOINT_NAME = "final_model.pt"
 FORMAL_EVAL_CHECKPOINT_NAME = BEST_CHECKPOINT_NAME
 FORMAL_EVAL_CHECKPOINT_RULE = "best_fixed_validation_pool_metric"
+CONSTRAINED_RANK_MIN_FEASIBLE_RATE = 0.30
+SCORE_POLICY_VERSION = "v20260324_narrative_aligned"
+RANKING_POLICY_VERSION = "tiered_feasible_rate_then_feasible_fee"
 
 # ========== 训练策略 ==========
 PRETRAIN_POLICY = "none"  # none / fifo / fair_fee / mixed
@@ -111,6 +120,7 @@ PRETRAIN_EPOCHS = 0
 PRETRAIN_EPISODES_PER_EPOCH = 8
 CURRICULUM_ENABLED = False
 CURRICULUM_STAGE_EPISODES = (0.3, 0.7, 1.0)
+EVIDENCE_FORMAL_MIN_SEEDS = 3
 
 # ========== 新增基线参数 ==========
 LINEAR_LAMBDA_F = 1.0   # Fee-Risk 线性评分: 手续费权重
@@ -137,3 +147,14 @@ def validate_pool_size(value: int) -> int:
             f"got {pool_size}"
         )
     return pool_size
+
+
+def effective_block_gas_limit(pool_size: int | None) -> int:
+    """根据场景配置返回有效区块 gas 上限。"""
+    if (
+        SMALL_POOL_STRESS_MODE
+        and pool_size is not None
+        and int(pool_size) <= int(SMALL_POOL_STRESS_THRESHOLD)
+    ):
+        return max(int(MAX_BLOCK_GAS * SMALL_POOL_STRESS_GAS_LIMIT_MULT), GAS_TRANSFER)
+    return MAX_BLOCK_GAS
