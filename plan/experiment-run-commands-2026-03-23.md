@@ -322,3 +322,78 @@ python experiments/run_experiments.py \
 1. 先按本文件执行 dry-run；
 2. dry-run 无异常后直接启动正式实验；
 3. 结果生成后立即回填论文第 5 章，并同步修正文中与最新代码实现不一致的描述。
+
+---
+
+## 十、2026-03-25 最小验证方案（已确认）
+
+> 目标：将总耗时压到约 24 小时内，优先保证“可支撑论文核心叙事”的最小证据链。  
+> 原则：主结论不减配，鲁棒性和消融降统计强度。
+
+### 10.1 配置裁剪
+
+- `main`：3 seeds（`42 123 789`），`episodes=3000`，`eval-episodes=1000`
+- `robustness`：2 seeds（`42 123`），`eval-episodes=500`
+- `ablation`：2 seeds（`42 123`），`episodes=1000`，`eval-episodes=300`
+- GPU 并行建议：`workers=3`，`max-gpu-workers=3`
+
+### 10.2 执行顺序与命令
+
+#### 步骤 A：先跑主实验（3 seeds）
+
+```bash
+python experiments/run_experiments.py \
+  --stages main \
+  --seeds 42 123 789 \
+  --episodes 3000 \
+  --eval-episodes 1000 \
+  --pool-size 300 \
+  --workers 3 \
+  --max-gpu-workers 3 \
+  --device cuda:0 \
+  --output results_formal_min_fast \
+  --resume
+```
+
+#### 步骤 B：再跑鲁棒性（2 seeds，复用主实验 checkpoint）
+
+```bash
+python experiments/run_experiments.py \
+  --stages robustness \
+  --seeds 42 123 \
+  --skip-train \
+  --episodes 3000 \
+  --eval-episodes 500 \
+  --pool-size 300 \
+  --workers 2 \
+  --max-gpu-workers 2 \
+  --device cuda:0 \
+  --output results_formal_min_fast \
+  --resume
+```
+
+#### 步骤 C：最后跑消融（2 seeds，降训练/评估规模）
+
+```bash
+python experiments/run_experiments.py \
+  --stages ablation \
+  --seeds 42 123 \
+  --episodes 1000 \
+  --eval-episodes 300 \
+  --pool-size 300 \
+  --workers 3 \
+  --max-gpu-workers 3 \
+  --device cuda:0 \
+  --output results_formal_min_fast \
+  --resume
+```
+
+### 10.3 RQ4 最小证据口径
+
+- 保留：`case_study.json`、`behavior_probe.json`、`pareto_episode_analysis.json`
+- 不新增额外长跑：线性拟合检验可先不做，放后续补强
+
+### 10.4 风险提示
+
+- 该方案可支撑方向性结论，但鲁棒性/消融属于“快速验证强度”；
+- 若用于最终定稿，建议后续补齐到正式强度（至少提升鲁棒性和消融 seed 数）。
