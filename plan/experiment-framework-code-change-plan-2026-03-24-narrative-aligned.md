@@ -247,3 +247,117 @@
 4. 消融报告必须包含 `delta_vs_full` 与 `pareto_tag`；
 5. constrained 排序逻辑可追溯（含 `ranking_policy_version`）。
 
+
+---
+
+## 9. 按“最新要求”更新：三目标尽可能最优（收益/公平/风险）
+
+> 最新要求摘要：
+> 1) 目标不是“单点收益最高”，而是三目标在业务约束下尽可能最优；
+> 2) 当前阶段优先补齐 fairness（可行率瓶颈）；
+> 3) 实验框架要支持 Aggressive / Balanced / Conservative 三档可切换策略。
+
+### 9.1 新的主协议（替换旧“单主分数”心智）
+
+统一采用“两层最优协议”：
+
+1. **硬约束层（必须先过）**
+   - fairness >= 0.90
+   - risk_exposure <= 0.30
+   - top10_risk <= 0.30
+2. **软目标层（在可行集合内优化）**
+   - 优先 `feasible_rate`
+   - 其次 `feasible_set_fee_mean`
+   - 并列时 `risk_adjusted_fee_score`
+
+### 9.2 代码改动点（新增/强化）
+
+#### A) `experiments/config.py`
+
+新增“运行档位配置”（用于三档策略切换）：
+
+- `OPERATING_MODE = "balanced"`（`aggressive|balanced|conservative`）
+- 三档权重模板：
+  - aggressive：fee 权重高，fairness/risk 约束保持不变；
+  - balanced：默认档，强调 feasible_rate 与可行域收益；
+  - conservative：fairness/risk 惩罚增强。
+
+并新增阈值分组配置：
+
+- `CONSTRAINT_PROFILE = "strict"|"relaxed_for_training"`
+- 训练可用 relaxed（仅训练阶段），评估固定 strict。
+
+#### B) `experiments/train.py`
+
+1. 增加阶段化训练调度（fairness-first curriculum）：
+   - Stage 1：提高公平奖励/门控影响；
+   - Stage 2：恢复收益权重，做 fee 回补；
+2. 增加 checkpoint 选择策略开关：
+   - `--val-metric constrained_fee|hypervolume|two_stage`；
+   - `two_stage`：先筛可行率，再筛可行域收益。
+
+#### C) `experiments/metrics.py`
+
+新增统一打分接口：
+
+- `two_stage_selection_score(metrics, constraints, mode)`
+  - 输出：`feasible_rate_tier`, `feasible_set_fee_mean`, `risk_adjusted_fee`
+- `operating_point_rank(payload, mode)`
+  - 输出三档模式下的排序结果（用于部署与论文表格）
+
+并保证所有不可行值不混入均值（保持 `None/null` + 计数）。
+
+#### D) `experiments/evaluate.py`
+
+新增输出：
+
+- `operating_points_summary.json`
+  - `aggressive/balanced/conservative` 三档各自的 top method、关键指标、可行率；
+- `constraint_bottleneck_report.json`
+  - 自动给出各方法 top1 违约项（当前应为 fairness）。
+
+#### E) `experiments/latex_tables.py`
+
+新增表格：
+
+- `table_operating_points.tex`（三档策略对比）
+- `table_constraint_bottleneck.tex`（违约主因）
+
+并在主表脚注固定声明：
+
+- “Primary decision rule: feasible-rate first, feasible-set fee second.”
+
+### 9.3 实施优先级（按你当前问题排）
+
+**P0（本周必须）**
+
+1. `metrics.py`：补 `two_stage_selection_score` 与 `operating_point_rank`；
+2. `evaluate.py`：产出 `constraint_bottleneck_report.json`；
+3. `run_experiments.py`：在 summary 写入 `operating_mode` 与 `selection_policy_version`。
+
+**P1（紧随其后）**
+
+1. `train.py`：加 `two_stage` 验证指标与 fairness-first curriculum 开关；
+2. `config.py`：落地三档 operating mode 配置模板。
+
+**P2（报告层）**
+
+1. `latex_tables.py`：生成 operating points 与 bottleneck 两张新表；
+2. `outputs_manifest.json`：要求新表与新 json 缺一不可。
+
+### 9.4 新验收标准（替换“只看综合分”）
+
+1. 任一正式结果目录必须包含：
+   - `constrained_eval_summary.json`
+   - `operating_points_summary.json`
+   - `constraint_bottleneck_report.json`
+2. 默认 `balanced` 模式下，排序遵循：
+   - feasible_rate 优先，fee 次优先；
+3. 结果报告必须给出三档策略（A/B/C）并明确推荐默认档（Balanced）；
+4. 若 fairness 仍为 top1 违约项，训练日志必须提示“进入 fairness-first 调参轮次”。
+
+### 9.5 与你当前决策问题的直接对应
+
+- 你问“三项尽可能最优先优化哪个”：框架层将其固化为**fairness-first**（先提可行率，再收敛收益）。
+- 你问“平时最优怎么选”：框架层将输出三档 operating points，默认给 `balanced`。
+- 这样后续实验不再靠人工解释，而是由代码协议直接产出可执行结论。
