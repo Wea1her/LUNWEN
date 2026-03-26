@@ -15,7 +15,7 @@ from networks import ActorCritic
 from ppo import PPOTrainer, RolloutBuffer
 from device_utils import resolve_device, seed_everything
 from evaluate import aggregate, build_shared_pools, evaluate_rl, save_shared_pools
-from metrics import compute_all_metrics
+from metrics import compute_all_metrics, two_stage_selection_score
 
 
 def _higher_is_better(metric: str) -> bool:
@@ -33,6 +33,13 @@ def _run_validation(model: ActorCritic,
                         **env_kwargs)
     metrics = evaluate_rl(model, env, len(validation_pools), device, validation_pools)
     agg = aggregate(metrics)
+    strict_constraints = C.resolve_constraints(profile="strict", for_training=False) if hasattr(C, "resolve_constraints") else {}
+    strict_constraints.update({
+        "fairness_floor": getattr(args, "val_fairness_floor", C.VALIDATION_FAIRNESS_FLOOR),
+        "oldest_coverage_floor": getattr(args, "val_oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR),
+        "risk_ceil": getattr(args, "val_risk_ceil", C.VALIDATION_RISK_CEIL),
+        "top10_risk_ceil": getattr(args, "val_top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL),
+    })
     if args.val_metric == "constrained_fee":
         fee = float(agg.get("block_fee_mean", 0.0))
         fairness = float(agg.get("fairness_mean", 0.0))
@@ -66,6 +73,17 @@ def _run_validation(model: ActorCritic,
         top10 = float(np.clip(agg.get("top10_risk_mean", 1.0), 0.0, 1.0))
         metric_key = "pareto_proxy"
         metric_value = 0.3 * fee_norm + 0.25 * fairness + 0.25 * oldest + 0.1 * (1.0 - risk) + 0.1 * (1.0 - top10)
+        score = metric_value
+    elif args.val_metric == "two_stage":
+        two_stage = two_stage_selection_score(
+            metrics,
+            constraints=strict_constraints,
+            mode=getattr(args, "operating_mode", getattr(C, "OPERATING_MODE", "balanced")),
+            target_metric="block_fee_norm",
+            min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+        )
+        metric_key = "two_stage_selection_score"
+        metric_value = float(two_stage["two_stage_selection_score"])
         score = metric_value
     else:
         metric_key = f"{args.val_metric}_mean"
@@ -172,6 +190,8 @@ def _resolve_curriculum_stage(ep: int, total_episodes: int, cuts: tuple[float, f
 def _curriculum_env_kwargs(base_env_kwargs: dict, args: argparse.Namespace, stage: int) -> dict:
     if not args.curriculum:
         return dict(base_env_kwargs)
+    if not getattr(args, "fairness_first", getattr(C, "FAIRNESS_FIRST_CURRICULUM_ENABLED", True)):
+        return dict(base_env_kwargs)
 
     kwargs = dict(base_env_kwargs)
     if stage == 1:
@@ -243,6 +263,7 @@ def train(args, env_kwargs: dict | None = None):
 
     curriculum_enabled = bool(getattr(args, "curriculum", C.CURRICULUM_ENABLED))
     curriculum_cuts = tuple(getattr(args, "curriculum_stage_episodes", C.CURRICULUM_STAGE_EPISODES))
+    fairness_first = bool(getattr(args, "fairness_first", getattr(C, "FAIRNESS_FIRST_CURRICULUM_ENABLED", True)))
     pretrain_policy = getattr(args, "pretrain_policy", C.PRETRAIN_POLICY)
     pretrain_epochs = int(getattr(args, "pretrain_epochs", C.PRETRAIN_EPOCHS))
     pretrain_episodes_per_epoch = int(
@@ -259,6 +280,7 @@ def train(args, env_kwargs: dict | None = None):
         current_stage = 3
     args.curriculum = curriculum_enabled
     args.curriculum_stage_episodes = curriculum_cuts
+    args.fairness_first = fairness_first
     active_env_kwargs = _curriculum_env_kwargs(base_env_kwargs, args, current_stage)
     env = TxOrderingEnv(
         pool_size=args.pool_size,
@@ -474,6 +496,7 @@ def train(args, env_kwargs: dict | None = None):
             },
             "curriculum": {
                 "enabled": curriculum_enabled,
+                "fairness_first": fairness_first,
                 "stage_episode_cuts": list(curriculum_cuts),
                 "stage_switches": log["stage_switches"],
             },
@@ -537,6 +560,9 @@ def main():
     parser.add_argument("--pretrain-episodes-per-epoch", type=int, default=C.PRETRAIN_EPISODES_PER_EPOCH)
     parser.add_argument("--curriculum", action="store_true", default=C.CURRICULUM_ENABLED)
     parser.add_argument("--curriculum-stage-episodes", type=float, nargs=3, default=C.CURRICULUM_STAGE_EPISODES)
+    parser.add_argument("--fairness-first", dest="fairness_first", action="store_true",
+                        default=getattr(C, "FAIRNESS_FIRST_CURRICULUM_ENABLED", True))
+    parser.add_argument("--no-fairness-first", dest="fairness_first", action="store_false")
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)

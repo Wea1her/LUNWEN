@@ -163,3 +163,27 @@
 | 文档 | 状态 | 修订内容 | 更新时间 |
 |------|------|----------|----------|
 | `plan/experiment-framework-code-change-plan-2026-03-23.md` | 已重写 | 基于最新 dry-run 结论，将改造目标从“继续强化 fairness”调整为“fairness 约束下的 risk / fee recovery”，并补充 fairness gate、terminal risk、warm-start、curriculum、constrained fee / Pareto 协议与“先改框架后调参”的实施顺序 | 2026-03-23 |
+
+## 十二、本次写作修订（2026-03-26，口径对齐版）
+
+| 文档 | 状态 | 修订内容 | 更新时间 |
+|------|------|----------|----------|
+| `chapters/journal/05-experiments.tex` | 已修订 | RQ2 从“稳定优势”改为“多数场景综合折中领先并识别边界”；RQ4 改为“条件决策迹象”；统计口径改为分层证据等级（正式/探索性）；本章小结取消“稳定可解释完整证据链”的强结论表述 | 2026-03-26 |
+| `chapters/journal/00-abstract.tex` | 已修订 | 摘要结果口径改为“收益与综合指标折中优势”，并明确公平性/风险非同时最优、约束评估存在可行率-收益权衡 | 2026-03-26 |
+| `chapters/journal/01-introduction.tex` | 已修订 | 贡献点第(3)改为“评估折中表现、适用边界与组件作用”，删除“验证稳定性”式措辞 | 2026-03-26 |
+| `chapters/journal/02-related-work.tex` | 已修订 | “多目标最优排序策略”改为“多目标折中排序策略”，避免理论先验过强 | 2026-03-26 |
+| `chapters/journal/06-conclusion.tex` | 已修订 | 结论段改为“当前结果支持折中优势”，并补充公平/风险分工与约束可行率-收益权衡 | 2026-03-26 |
+
+## 十三、实验框架改造落地（2026-03-26）
+
+| 模块 | 状态 | 变更要点 | 更新时间 |
+|------|------|----------|----------|
+| `experiments/config.py` | 已完成 | 新增 `OPERATING_MODE` 三档、`CONSTRAINT_PROFILE` 与 `SELECTION_POLICY_VERSION`，统一运行档位与约束配置入口 | 2026-03-26 |
+| `experiments/metrics.py` | 已完成 | 新增 `two_stage_selection_score` 与 `operating_point_rank`，`summary_metric_bundle` 补齐 `feasible_rate_tier/violation_count/effective_variance` 输出 | 2026-03-26 |
+| `experiments/evaluate.py` | 已完成 | 新增 `operating_points_summary.json` 与 `constraint_bottleneck_report.json` 输出链路 | 2026-03-26 |
+| `experiments/run_experiments.py` | 已完成 | 接入三档策略排序、新增两张表与两份 JSON、`outputs_manifest` 升级、`run_summary` 写入 `operating_mode/selection_policy_version` | 2026-03-26 |
+| `experiments/latex_tables.py` | 已完成 | 新增 `table_operating_points` / `table_constraint_bottleneck` 生成函数，约束主表补充 `violation_count` | 2026-03-26 |
+| `experiments/train.py` | 已完成 | 增加 `--val-metric two_stage` 与 `fairness-first` 开关，支持两阶段 checkpoint 选模 | 2026-03-26 |
+| `plan/experiment-run-commands-2026-03-26.md` | 已完成 | 正式命令同步两阶段收敛、三档策略参数与新增产物检查项 | 2026-03-26 |
+| `plan/outline.md` | 已完成 | 重写为干净版，新增 two-stage 协议、evidence level、新增表格口径 | 2026-03-26 |
+| `plan/project-overview.md` | 已完成 | 更新当前阶段与协议能力描述，补齐新文档与产物清单 | 2026-03-26 |

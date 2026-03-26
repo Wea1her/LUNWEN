@@ -22,7 +22,8 @@ from networks import ActorCritic
 from train import train as train_model
 from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
                       evaluate_rl, evaluate_baseline, aggregate,
-                      build_fairness_decomposition,
+                      build_fairness_decomposition, build_constrained_eval_summary,
+                      build_operating_points_summary, build_constraint_bottleneck_report,
                       plot_training_curve)
 from baselines import run_baseline
 from metrics import (compute_all_metrics, constrained_ranking, pareto_dominates,
@@ -32,7 +33,8 @@ from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_fairness_decomp_table, generate_constrained_main_table,
                           generate_main_core_table, generate_main_fullmetrics_table,
                           generate_pareto_main_table, generate_protocol_ablation_table,
-                          append_exploratory_note,
+                          generate_operating_points_table, generate_constraint_bottleneck_table,
+                          append_exploratory_note, append_primary_decision_rule_note,
                           ABLATION_ORDER, PROTOCOL_ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS, PROTOCOL_ABLATION_LABELS)
@@ -208,6 +210,16 @@ def _run_main_evaluation(model, device, args, seed, result_dir):
     _write_json(
         os.path.join(result_dir, "fairness_decomposition.json"),
         build_fairness_decomposition(raw),
+    )
+    constrained_seed = build_constrained_eval_summary(raw)
+    _write_json(os.path.join(result_dir, "constrained_eval_summary.json"), constrained_seed)
+    _write_json(
+        os.path.join(result_dir, "operating_points_summary.json"),
+        build_operating_points_summary(constrained_seed),
+    )
+    _write_json(
+        os.path.join(result_dir, "constraint_bottleneck_report.json"),
+        build_constraint_bottleneck_report(constrained_seed),
     )
     _write_json(os.path.join(result_dir, "main_episode_metrics.json"), {
         "seed": seed,
@@ -407,6 +419,15 @@ def run_single_seed(seed, args_dict):
     if not args.skip_train:
         print(f"[seed={seed}] 开始训练", flush=True)
         seed_everything(seed)
+        train_env_kwargs = {}
+        if hasattr(C, "resolve_constraints"):
+            train_cons = C.resolve_constraints(profile=args.training_constraint_profile, for_training=True)
+            train_env_kwargs["fairness_gate_threshold"] = float(
+                train_cons.get("fairness_floor", C.FAIRNESS_GATE_THRESHOLD)
+            )
+            train_env_kwargs["fairness_oldest_coverage_floor"] = float(
+                train_cons.get("oldest_coverage_floor", C.FAIRNESS_OLDEST_COVERAGE_FLOOR)
+            )
         train_args = argparse.Namespace(
             episodes=args.episodes,
             pool_size=args.pool_size,
@@ -427,9 +448,11 @@ def run_single_seed(seed, args_dict):
             pretrain_episodes_per_epoch=args.pretrain_episodes_per_epoch,
             curriculum=args.curriculum,
             curriculum_stage_episodes=args.curriculum_stage_episodes,
+            fairness_first=args.fairness_first,
+            operating_mode=args.operating_mode,
         )
         t0 = time.perf_counter()
-        train_model(train_args)
+        train_model(train_args, env_kwargs=train_env_kwargs)
         timing["train"] = time.perf_counter() - t0
         print(f"[seed={seed}] 训练完成", flush=True)
 
@@ -867,6 +890,57 @@ def run_ablation_parallel(configs, args, label_prefix, metrics=None):
     return agg
 
 
+def _infer_pareto_tag(delta_vs_full: dict) -> str:
+    fee_delta = float(delta_vs_full.get("block_fee", {}).get("mean_delta", 0.0))
+    fairness_delta = float(delta_vs_full.get("fairness", {}).get("mean_delta", 0.0))
+    risk_delta = float(delta_vs_full.get("risk_exposure", {}).get("mean_delta", 0.0))
+    top10_delta = float(delta_vs_full.get("top10_risk", {}).get("mean_delta", 0.0))
+
+    risk_improved = (risk_delta < 0.0) or (top10_delta < 0.0)
+    if fee_delta > 0.0 and fairness_delta <= 0.0 and not risk_improved:
+        return "Fee-lean"
+    if fairness_delta > 0.0 and fee_delta <= 0.0 and risk_improved:
+        return "Fair-lean"
+    if risk_improved and fee_delta <= 0.0:
+        return "Risk-lean"
+    return "Balanced-shift"
+
+
+def _annotate_ablation_tradeoff(agg: dict, full_key: str, core_metrics: list[str]) -> tuple[dict, bool]:
+    if full_key not in agg:
+        return agg, False
+    full_payload = agg[full_key]
+    tradeoff_found = False
+    lower_is_better = {"risk_exposure", "top10_risk", "starvation_gap"}
+    for variant, payload in agg.items():
+        delta = {}
+        n_better = 0
+        for metric in core_metrics:
+            metric_key = f"{metric}_mean"
+            if metric_key not in payload or metric_key not in full_payload:
+                continue
+            mean_delta = float(payload[metric_key]) - float(full_payload[metric_key])
+            higher_better = metric not in lower_is_better
+            is_better = mean_delta > 0.0 if higher_better else mean_delta < 0.0
+            if variant != full_key and is_better:
+                n_better += 1
+            delta[metric] = {
+                "mean_delta": mean_delta,
+                "is_better_than_full": bool(is_better),
+                "higher_is_better": bool(higher_better),
+            }
+        payload["delta_vs_full"] = delta
+        if variant == full_key:
+            payload["pareto_tag"] = "Full-Reference"
+            payload["n_better_core_metrics"] = 0
+            continue
+        payload["pareto_tag"] = _infer_pareto_tag(delta)
+        payload["n_better_core_metrics"] = n_better
+        if n_better >= 1:
+            tradeoff_found = True
+    return agg, tradeoff_found
+
+
 def _resolve_stages(args):
     stages = set(args.stages or [])
     if args.ablation:
@@ -975,6 +1049,9 @@ STAGE_REQUIRED_FILES = {
     "main": [
         "main_results.json",
         "fairness_decomposition.json",
+        "constrained_eval_summary.json",
+        "operating_points_summary.json",
+        "constraint_bottleneck_report.json",
         "main_episode_metrics.json",
         "case_study_seed.json",
     ],
@@ -1194,6 +1271,8 @@ def _build_constrained_eval_summary_from_rows(
     payload = {
         "score_policy_version": C.SCORE_POLICY_VERSION,
         "ranking_policy_version": C.RANKING_POLICY_VERSION,
+        "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "operating_mode": getattr(args, "operating_mode", getattr(C, "OPERATING_MODE", "balanced")),
         "constraints": constraints,
         "methods": {},
     }
@@ -1207,9 +1286,11 @@ def _build_constrained_eval_summary_from_rows(
             metrics_seq,
             constraints=constraints,
             target_metric="block_fee_norm",
+            mode=getattr(args, "operating_mode", getattr(C, "OPERATING_MODE", "balanced")),
         )
         payload["methods"][method_id] = {
             "feasible_rate": bundle["feasible_rate"],
+            "feasible_rate_tier": bundle["feasible_rate_tier"],
             "feasible_fee_mean": bundle["feasible_set_fee_mean"],
             "feasible_fee_std": bundle["feasible_set_fee_std"],
             # backward compatibility
@@ -1220,13 +1301,20 @@ def _build_constrained_eval_summary_from_rows(
             "risk_adjusted_fee_mean": bundle["risk_adjusted_fee_mean"],
             "risk_adjusted_fee_std": bundle["risk_adjusted_fee_std"],
             "infeasible_count": bundle["infeasible_count"],
+            "violation_count": bundle["violation_count"],
             "n_episodes": bundle["n_episodes"],
+            "two_stage_selection_score": bundle["two_stage_selection_score"],
+            "selection_policy_version": bundle["selection_policy_version"],
+            "operating_mode": bundle["operating_mode"],
             "violation_breakdown": bundle["violation_breakdown"],
             "constraint_violation_top1": bundle["constraint_violation_top1"],
+            "effective_variance_checks": bundle["effective_variance_checks"],
+            "low_variance_flags": bundle["low_variance_flags"],
         }
     payload["ranking"] = constrained_ranking(
         payload["methods"],
         min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+        mode=getattr(args, "operating_mode", getattr(C, "OPERATING_MODE", "balanced")),
     )
     return payload
 
@@ -1347,6 +1435,18 @@ def main():
     parser.add_argument("--track", type=str, default="composite_optimal_track",
                         choices=["fairness_recovery_track", "composite_optimal_track"],
                         help="正式协议轨道：fairness_recovery_track 或 composite_optimal_track")
+    parser.add_argument("--operating-mode", type=str,
+                        choices=["aggressive", "balanced", "conservative"],
+                        default=getattr(C, "OPERATING_MODE", "balanced"),
+                        help="运行策略档位：aggressive / balanced / conservative")
+    parser.add_argument("--constraint-profile", type=str,
+                        choices=["strict", "relaxed_for_training"],
+                        default=getattr(C, "CONSTRAINT_PROFILE", "strict"),
+                        help="评估约束 profile，默认 strict")
+    parser.add_argument("--training-constraint-profile", type=str,
+                        choices=["strict", "relaxed_for_training"],
+                        default=getattr(C, "TRAINING_CONSTRAINT_PROFILE", "relaxed_for_training"),
+                        help="训练阶段约束 profile，默认 relaxed_for_training")
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
@@ -1360,7 +1460,22 @@ def main():
     parser.add_argument("--pretrain-episodes-per-epoch", type=int, default=C.PRETRAIN_EPISODES_PER_EPOCH)
     parser.add_argument("--curriculum", action="store_true", default=C.CURRICULUM_ENABLED)
     parser.add_argument("--curriculum-stage-episodes", type=float, nargs=3, default=C.CURRICULUM_STAGE_EPISODES)
+    parser.add_argument("--fairness-first", dest="fairness_first", action="store_true",
+                        default=getattr(C, "FAIRNESS_FIRST_CURRICULUM_ENABLED", True))
+    parser.add_argument("--no-fairness-first", dest="fairness_first", action="store_false")
     args = parser.parse_args()
+    if hasattr(C, "resolve_constraints"):
+        eval_cons = C.resolve_constraints(profile=args.constraint_profile, for_training=False)
+        if args.val_fairness_floor == C.VALIDATION_FAIRNESS_FLOOR:
+            args.val_fairness_floor = float(eval_cons.get("fairness_floor", args.val_fairness_floor))
+        if args.val_oldest_coverage_floor == C.VALIDATION_OLDEST_COVERAGE_FLOOR:
+            args.val_oldest_coverage_floor = float(
+                eval_cons.get("oldest_coverage_floor", args.val_oldest_coverage_floor)
+            )
+        if args.val_risk_ceil == C.VALIDATION_RISK_CEIL:
+            args.val_risk_ceil = float(eval_cons.get("risk_ceil", args.val_risk_ceil))
+        if args.val_top10_risk_ceil == C.VALIDATION_TOP10_RISK_CEIL:
+            args.val_top10_risk_ceil = float(eval_cons.get("top10_risk_ceil", args.val_top10_risk_ceil))
     _resolve_stages(args)
     _apply_track_defaults(args)
     args.device_map = _parse_device_map(args.device_map)
@@ -1391,6 +1506,8 @@ def main():
     print(f"Pool size: {args.pool_size}")
     print(f"Baselines: {args.baseline_methods}")
     print(f"Track: {args.track}")
+    print(f"Operating mode: {args.operating_mode}")
+    print(f"Constraint profile (eval/train): {args.constraint_profile}/{args.training_constraint_profile}")
     print(
         "Validation protocol: "
         f"metric={args.val_metric}, fairness>={args.val_fairness_floor}, "
@@ -1421,6 +1538,10 @@ def main():
         "device": str(device),
         "device_map": {str(k): v for k, v in args.device_map.items()},
         "baseline_methods": args.baseline_methods,
+        "operating_mode": args.operating_mode,
+        "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "constraint_profile": args.constraint_profile,
+        "training_constraint_profile": args.training_constraint_profile,
         "validation_protocol": {
             "metric": args.val_metric,
             "fairness_floor": args.val_fairness_floor,
@@ -1573,10 +1694,8 @@ def main():
             f.write(t2)
         run_summary["outputs"]["table2"] = os.path.basename(t2_path)
 
-        core_table = append_exploratory_note(
-            generate_main_core_table(agg_main),
-            run_summary["evidence_level"],
-        )
+        core_table = append_primary_decision_rule_note(generate_main_core_table(agg_main))
+        core_table = append_exploratory_note(core_table, run_summary["evidence_level"])
         core_table_path = os.path.join(args.output, "table_main_core.tex")
         with open(core_table_path, "w") as f:
             f.write(core_table)
@@ -1659,7 +1778,7 @@ def main():
             constrained_path = os.path.join(args.output, "constrained_eval_summary.json")
             _write_json(constrained_path, constrained_summary)
             run_summary["outputs"]["constrained_eval_summary"] = os.path.basename(constrained_path)
-            constrained_tex = generate_constrained_main_table(constrained_summary)
+            constrained_tex = append_primary_decision_rule_note(generate_constrained_main_table(constrained_summary))
             constrained_tex_path = os.path.join(args.output, "table_constrained_main.tex")
             with open(constrained_tex_path, "w") as f:
                 f.write(append_exploratory_note(constrained_tex, run_summary["evidence_level"]))
@@ -1668,6 +1787,26 @@ def main():
             with open(table_constraints_path, "w") as f:
                 f.write(append_exploratory_note(constrained_tex, run_summary["evidence_level"]))
             run_summary["outputs"]["table_main_constraints"] = os.path.basename(table_constraints_path)
+
+            operating_points = build_operating_points_summary(constrained_summary)
+            operating_points_path = os.path.join(args.output, "operating_points_summary.json")
+            _write_json(operating_points_path, operating_points)
+            run_summary["outputs"]["operating_points_summary"] = os.path.basename(operating_points_path)
+            operating_points_tex = generate_operating_points_table(operating_points)
+            operating_points_tex_path = os.path.join(args.output, "table_operating_points.tex")
+            with open(operating_points_tex_path, "w") as f:
+                f.write(append_exploratory_note(operating_points_tex, run_summary["evidence_level"]))
+            run_summary["outputs"]["table_operating_points"] = os.path.basename(operating_points_tex_path)
+
+            constraint_bottleneck = build_constraint_bottleneck_report(constrained_summary)
+            constraint_bottleneck_path = os.path.join(args.output, "constraint_bottleneck_report.json")
+            _write_json(constraint_bottleneck_path, constraint_bottleneck)
+            run_summary["outputs"]["constraint_bottleneck_report"] = os.path.basename(constraint_bottleneck_path)
+            bottleneck_tex = generate_constraint_bottleneck_table(constraint_bottleneck)
+            bottleneck_tex_path = os.path.join(args.output, "table_constraint_bottleneck.tex")
+            with open(bottleneck_tex_path, "w") as f:
+                f.write(append_exploratory_note(bottleneck_tex, run_summary["evidence_level"]))
+            run_summary["outputs"]["table_constraint_bottleneck"] = os.path.basename(bottleneck_tex_path)
 
             pareto_episode, dominance_matrix = _build_pareto_outputs_from_rows(
                 main_episode_rows,
@@ -1716,27 +1855,68 @@ def main():
             print("Warning: scipy 未安装, 跳过显著性检验与对应 LaTeX 表格生成。")
 
     if "ablation" in args.stages:
+        ablation_core_metrics = [
+            "block_fee",
+            "fairness",
+            "risk_exposure",
+            "top10_risk",
+            "composite_score",
+            "constrained_fee_score",
+            "risk_adjusted_fee_score",
+            "gas_util",
+        ]
+        tradeoff_note = "Ablation indicates trade-off shift, not monotonic degradation."
+
         print("\n===== 奖励消融实验 =====", flush=True)
         t_abl_reward = time.perf_counter()
-        agg_reward_abl = run_ablation_parallel(REWARD_ABLATION_CONFIGS, args, "reward")
+        agg_reward_abl = run_ablation_parallel(
+            REWARD_ABLATION_CONFIGS,
+            args,
+            "reward",
+            metrics=ablation_core_metrics,
+        )
+        agg_reward_abl, reward_tradeoff = _annotate_ablation_tradeoff(
+            agg_reward_abl,
+            full_key="Ours-FullBalanced",
+            core_metrics=ablation_core_metrics,
+        )
         ablation_reward_seconds = time.perf_counter() - t_abl_reward
         t_rw = generate_ablation_table(agg_reward_abl, ABLATION_ORDER, ABLATION_LABELS)
         rw_path = os.path.join(args.output, "table_ablation_reward.tex")
         with open(rw_path, "w") as f:
             f.write(append_exploratory_note(t_rw, run_summary["evidence_level"]))
+        if reward_tradeoff:
+            with open(rw_path, "a") as f:
+                f.write(f"% NOTE: {tradeoff_note}\n")
         abl_rw_json = os.path.join(args.output, "ablation_reward.json")
         _write_json(abl_rw_json, agg_reward_abl)
 
         print("\n===== 结构消融实验 =====", flush=True)
         t_abl_struct = time.perf_counter()
-        agg_struct_abl = run_ablation_parallel(STRUCT_ABLATION_CONFIGS, args, "struct")
+        agg_struct_abl = run_ablation_parallel(
+            STRUCT_ABLATION_CONFIGS,
+            args,
+            "struct",
+            metrics=ablation_core_metrics,
+        )
+        agg_struct_abl, struct_tradeoff = _annotate_ablation_tradeoff(
+            agg_struct_abl,
+            full_key="Ours-Full",
+            core_metrics=ablation_core_metrics,
+        )
         ablation_struct_seconds = time.perf_counter() - t_abl_struct
         t_st = generate_ablation_table(agg_struct_abl, STRUCT_ABLATION_ORDER, STRUCT_ABLATION_LABELS)
         st_path = os.path.join(args.output, "table_ablation_struct.tex")
         with open(st_path, "w") as f:
             f.write(append_exploratory_note(t_st, run_summary["evidence_level"]))
+        if struct_tradeoff:
+            with open(st_path, "a") as f:
+                f.write(f"% NOTE: {tradeoff_note}\n")
         abl_st_json = os.path.join(args.output, "ablation_struct.json")
         _write_json(abl_st_json, agg_struct_abl)
+
+        if reward_tradeoff or struct_tradeoff:
+            run_summary.setdefault("ablation_notes", []).append(tradeoff_note)
 
         run_summary["outputs"]["ablation_reward_json"] = os.path.basename(abl_rw_json)
         run_summary["outputs"]["ablation_struct_json"] = os.path.basename(abl_st_json)
@@ -1785,17 +1965,24 @@ def main():
         "table_main_core",
         "table_main_fullmetrics",
         "table_main_constraints",
+        "table_operating_points",
+        "table_constraint_bottleneck",
+        "constrained_eval_summary",
+        "operating_points_summary",
+        "constraint_bottleneck_report",
         "narrative_guard",
     ]
     missing = [k for k in required_for_main_story if k not in run_summary["outputs"]]
     outputs_manifest = {
-        "version": "v20260324_narrative_package",
+        "version": "v20260326_operating_points_package",
         "required_keys": required_for_main_story,
         "missing_keys": missing,
         "report_incomplete": len(missing) > 0,
         "evidence_level": run_summary.get("evidence_level", "unknown"),
         "score_policy_version": C.SCORE_POLICY_VERSION,
         "ranking_policy_version": C.RANKING_POLICY_VERSION,
+        "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "operating_mode": args.operating_mode,
     }
     outputs_manifest_path = os.path.join(args.output, "outputs_manifest.json")
     _write_json(outputs_manifest_path, outputs_manifest)

@@ -197,22 +197,8 @@ def constrained_success_score(metrics: dict,
                               target_metric: str = "block_fee_norm",
                               infeasible_score: float | None = -1.0) -> float | None:
     """约束式得分: 满足约束时返回目标指标，否则给不可行分。"""
-    cons = constraints or {}
-    fairness_floor = float(cons.get("fairness_floor", C.VALIDATION_FAIRNESS_FLOOR))
-    oldest_floor = float(cons.get("oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR))
-    risk_ceil = float(cons.get("risk_ceil", C.VALIDATION_RISK_CEIL))
-    top10_risk_ceil = float(cons.get("top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL))
-
-    fairness = float(metrics.get("fairness", 0.0))
-    oldest_cov = float(metrics.get("oldest_coverage", 0.0))
-    risk = float(metrics.get("risk_exposure", 1.0))
-    top10_risk = float(metrics.get("top10_risk", 1.0))
-    feasible = (
-        fairness >= fairness_floor
-        and oldest_cov >= oldest_floor
-        and risk <= risk_ceil
-        and top10_risk <= top10_risk_ceil
-    )
+    cons = _resolve_constraints(constraints)
+    feasible = _is_feasible(metrics, cons)
     if not feasible:
         if infeasible_score is None:
             return None
@@ -220,10 +206,41 @@ def constrained_success_score(metrics: dict,
     return float(metrics.get(target_metric, 0.0))
 
 
+def _resolve_constraints(constraints: dict | None = None) -> dict:
+    """统一解析约束配置，默认使用 strict 评估口径。"""
+    if constraints is not None:
+        return constraints
+    if hasattr(C, "resolve_constraints"):
+        return C.resolve_constraints(profile="strict", for_training=False)
+    return {
+        "fairness_floor": C.VALIDATION_FAIRNESS_FLOOR,
+        "oldest_coverage_floor": C.VALIDATION_OLDEST_COVERAGE_FLOOR,
+        "risk_ceil": C.VALIDATION_RISK_CEIL,
+        "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,
+    }
+
+
+def _is_feasible(metrics: dict, constraints: dict) -> bool:
+    fairness_floor = float(constraints.get("fairness_floor", C.VALIDATION_FAIRNESS_FLOOR))
+    oldest_floor = float(constraints.get("oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR))
+    risk_ceil = float(constraints.get("risk_ceil", C.VALIDATION_RISK_CEIL))
+    top10_risk_ceil = float(constraints.get("top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL))
+    fairness = float(metrics.get("fairness", 0.0))
+    oldest_cov = float(metrics.get("oldest_coverage", 0.0))
+    risk = float(metrics.get("risk_exposure", 1.0))
+    top10_risk = float(metrics.get("top10_risk", 1.0))
+    return (
+        fairness >= fairness_floor
+        and oldest_cov >= oldest_floor
+        and risk <= risk_ceil
+        and top10_risk <= top10_risk_ceil
+    )
+
+
 def violation_breakdown(metrics_seq: list[dict],
                         constraints: dict | None = None) -> dict:
     """统计每类约束违约次数。"""
-    cons = constraints or {}
+    cons = _resolve_constraints(constraints)
     fairness_floor = float(cons.get("fairness_floor", C.VALIDATION_FAIRNESS_FLOOR))
     oldest_floor = float(cons.get("oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR))
     risk_ceil = float(cons.get("risk_ceil", C.VALIDATION_RISK_CEIL))
@@ -259,20 +276,16 @@ def feasible_rate(metrics_seq: list[dict], constraints: dict | None = None) -> f
     """可行样本占比。"""
     if not metrics_seq:
         return 0.0
-    cons = constraints or {}
-    scores = [
-        constrained_success_score(m, constraints=cons, target_metric="block_fee_norm", infeasible_score=None)
-        for m in metrics_seq
-    ]
-    feasible = [v for v in scores if v is not None]
-    return len(feasible) / len(scores)
+    cons = _resolve_constraints(constraints)
+    feasible = [1 for m in metrics_seq if _is_feasible(m, cons)]
+    return len(feasible) / len(metrics_seq)
 
 
 def feasible_set_fee_score(metrics_seq: list[dict],
                            constraints: dict | None = None,
                            target_metric: str = "block_fee_norm") -> dict:
     """仅在可行子集上计算收益统计；不可行样本不参与均值。"""
-    cons = constraints or {}
+    cons = _resolve_constraints(constraints)
     scores = [
         constrained_success_score(m, constraints=cons, target_metric=target_metric, infeasible_score=None)
         for m in metrics_seq
@@ -298,30 +311,143 @@ def effective_variance_check(values: list[float], epsilon: float = 1e-10) -> dic
     }
 
 
-def constrained_ranking(method_payload: dict[str, dict],
-                        min_feasible_rate: float = C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE) -> list[str]:
-    """两段式 constrained 排序：先可行率档位，再可行域收益。"""
-    scored = []
+def two_stage_selection_score(
+    metrics_seq: list[dict],
+    constraints: dict | None = None,
+    mode: str | None = None,
+    target_metric: str = "block_fee_norm",
+    min_feasible_rate: float = C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+) -> dict:
+    """两阶段选优分：可行率优先，其次可行域收益，再看风险调整收益。"""
+    cons = _resolve_constraints(constraints)
+    fr = feasible_rate(metrics_seq, constraints=cons)
+    feasible_stats = feasible_set_fee_score(metrics_seq, constraints=cons, target_metric=target_metric)
+    feasible_risk_adj = [
+        risk_adjusted_fee_score(m)
+        for m in metrics_seq
+        if _is_feasible(m, cons)
+    ]
+    risk_adj_mean = float(np.mean(feasible_risk_adj)) if feasible_risk_adj else None
+
+    if hasattr(C, "normalize_operating_mode"):
+        mode_norm = C.normalize_operating_mode(mode)
+    else:
+        mode_norm = str(mode or "balanced").lower()
+    if hasattr(C, "operating_mode_weights"):
+        weights = C.operating_mode_weights(mode_norm)
+    else:
+        weights = {"tier": 7.0, "feasible_rate": 5.0, "feasible_fee": 6.0, "risk_adjusted_fee": 3.0}
+
+    tier = 1 if fr >= min_feasible_rate else 0
+    fee_for_score = float(feasible_stats["feasible_fee_mean"]) if feasible_stats["feasible_fee_mean"] is not None else -1.0
+    risk_for_score = float(risk_adj_mean) if risk_adj_mean is not None else -1.0
+    selection_score = (
+        float(weights.get("tier", 0.0)) * tier
+        + float(weights.get("feasible_rate", 0.0)) * fr
+        + float(weights.get("feasible_fee", 0.0)) * fee_for_score
+        + float(weights.get("risk_adjusted_fee", 0.0)) * risk_for_score
+    )
+
+    return {
+        "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "operating_mode": mode_norm,
+        "feasible_rate_tier": tier,
+        "feasible_rate": fr,
+        "feasible_set_fee_mean": feasible_stats["feasible_fee_mean"],
+        "risk_adjusted_fee": risk_adj_mean,
+        "two_stage_selection_score": float(selection_score),
+    }
+
+
+def operating_point_rank(
+    method_payload: dict[str, dict],
+    mode: str | None = None,
+    min_feasible_rate: float = C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+) -> list[dict]:
+    """输出三档 operating mode 下的方法排序与关键分解字段。"""
+    if hasattr(C, "normalize_operating_mode"):
+        mode_norm = C.normalize_operating_mode(mode)
+    else:
+        mode_norm = str(mode or "balanced").lower()
+    if hasattr(C, "operating_mode_weights"):
+        weights = C.operating_mode_weights(mode_norm)
+    else:
+        weights = {"tier": 7.0, "feasible_rate": 5.0, "feasible_fee": 6.0, "risk_adjusted_fee": 3.0}
+
+    rows = []
     for method, item in method_payload.items():
         fr = float(item.get("feasible_rate", 0.0))
-        tier = 1 if fr >= min_feasible_rate else 0
-        fee = item.get("feasible_fee_mean")
-        fee_key = float("-inf") if fee is None else float(fee)
-        risk_adj = float(item.get("risk_adjusted_fee_mean", float("-inf")))
-        scored.append((method, tier, fr, fee_key, risk_adj))
-    scored.sort(key=lambda x: (x[1], x[2], x[3], x[4]), reverse=True)
-    return [m for m, *_ in scored]
+        tier = int(item.get("feasible_rate_tier", 1 if fr >= min_feasible_rate else 0))
+        fee_raw = item.get("feasible_fee_mean", item.get("feasible_set_fee_mean", item.get("constrained_fee_mean")))
+        risk_adj_raw = item.get("risk_adjusted_fee_mean", item.get("risk_adjusted_fee"))
+        fee = float(fee_raw) if fee_raw is not None else -1.0
+        risk_adj = float(risk_adj_raw) if risk_adj_raw is not None else -1.0
+        score = (
+            float(weights.get("tier", 0.0)) * tier
+            + float(weights.get("feasible_rate", 0.0)) * fr
+            + float(weights.get("feasible_fee", 0.0)) * fee
+            + float(weights.get("risk_adjusted_fee", 0.0)) * risk_adj
+        )
+        rows.append({
+            "method": method,
+            "operating_mode": mode_norm,
+            "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+            "feasible_rate_tier": tier,
+            "feasible_rate": fr,
+            "feasible_set_fee_mean": None if fee_raw is None else float(fee_raw),
+            "risk_adjusted_fee_mean": None if risk_adj_raw is None else float(risk_adj_raw),
+            "two_stage_selection_score": float(score),
+        })
+    rows.sort(
+        key=lambda x: (
+            x["two_stage_selection_score"],
+            x["feasible_rate_tier"],
+            x["feasible_rate"],
+            -1.0 if x["feasible_set_fee_mean"] is None else x["feasible_set_fee_mean"],
+            -1.0 if x["risk_adjusted_fee_mean"] is None else x["risk_adjusted_fee_mean"],
+        ),
+        reverse=True,
+    )
+    for rank, row in enumerate(rows, start=1):
+        row["rank"] = rank
+    return rows
+
+
+def constrained_ranking(method_payload: dict[str, dict],
+                        min_feasible_rate: float = C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+                        mode: str = "balanced") -> list[str]:
+    """两段式 constrained 排序：先可行率档位，再可行域收益。"""
+    rows = operating_point_rank(
+        method_payload,
+        mode=mode,
+        min_feasible_rate=min_feasible_rate,
+    )
+    return [row["method"] for row in rows]
 
 
 def summary_metric_bundle(metrics_seq: list[dict],
                           constraints: dict | None = None,
-                          target_metric: str = "block_fee_norm") -> dict:
+                          target_metric: str = "block_fee_norm",
+                          mode: str | None = None) -> dict:
     """统一输出 constrained 与解释性统计字段。"""
-    cons = constraints or {}
+    cons = _resolve_constraints(constraints)
     feasible_stats = feasible_set_fee_score(metrics_seq, constraints=cons, target_metric=target_metric)
+    two_stage = two_stage_selection_score(
+        metrics_seq,
+        constraints=cons,
+        mode=mode,
+        target_metric=target_metric,
+        min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+    )
     vb = violation_breakdown(metrics_seq, constraints=cons)
     all_fee_vals = [float(m.get(target_metric, 0.0)) for m in metrics_seq]
     all_risk_adjusted = [risk_adjusted_fee_score(m) for m in metrics_seq]
+    variance_metrics = ("block_fee_norm", "oldest_coverage", "tail_wait_reduction", "wait_p95", "wait_p99", "wait_gini")
+    effective_variance_checks = {
+        metric: effective_variance_check([float(m.get(metric, 0.0)) for m in metrics_seq])
+        for metric in variance_metrics
+    }
+    low_variance_flags = [m for m, c in effective_variance_checks.items() if c.get("is_low_variance")]
     top_violation = max(
         ("fairness_floor", "oldest_coverage_floor", "risk_ceil", "top10_risk_ceil"),
         key=lambda k: vb[k],
@@ -330,17 +456,24 @@ def summary_metric_bundle(metrics_seq: list[dict],
         "score_policy_version": C.SCORE_POLICY_VERSION,
         "ranking_policy_version": C.RANKING_POLICY_VERSION,
         "feasible_rate": feasible_rate(metrics_seq, constraints=cons),
+        "feasible_rate_tier": two_stage["feasible_rate_tier"],
         "feasible_set_fee_mean": feasible_stats["feasible_fee_mean"],
         "feasible_set_fee_std": feasible_stats["feasible_fee_std"],
         "feasible_count": feasible_stats["feasible_count"],
         "infeasible_count": feasible_stats["infeasible_count"],
+        "violation_count": vb["any_violation"],
         "n_episodes": feasible_stats["n_episodes"],
         "all_episode_fee_mean": float(np.mean(all_fee_vals)) if all_fee_vals else 0.0,
         "all_episode_fee_std": float(np.std(all_fee_vals)) if all_fee_vals else 0.0,
         "risk_adjusted_fee_mean": float(np.mean(all_risk_adjusted)) if all_risk_adjusted else 0.0,
         "risk_adjusted_fee_std": float(np.std(all_risk_adjusted)) if all_risk_adjusted else 0.0,
+        "two_stage_selection_score": two_stage["two_stage_selection_score"],
+        "selection_policy_version": two_stage["selection_policy_version"],
+        "operating_mode": two_stage["operating_mode"],
         "violation_breakdown": vb,
         "constraint_violation_top1": top_violation,
+        "effective_variance_checks": effective_variance_checks,
+        "low_variance_flags": low_variance_flags,
     }
 
 

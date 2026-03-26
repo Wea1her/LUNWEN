@@ -113,6 +113,45 @@ FORMAL_EVAL_CHECKPOINT_RULE = "best_fixed_validation_pool_metric"
 CONSTRAINED_RANK_MIN_FEASIBLE_RATE = 0.30
 SCORE_POLICY_VERSION = "v20260324_narrative_aligned"
 RANKING_POLICY_VERSION = "tiered_feasible_rate_then_feasible_fee"
+SELECTION_POLICY_VERSION = "v20260326_two_stage_operating_points"
+OPERATING_MODE = "balanced"  # aggressive / balanced / conservative
+OPERATING_MODES = ("aggressive", "balanced", "conservative")
+OPERATING_MODE_WEIGHTS = {
+    # 先保证可行率，再看可行域收益；激进档更偏收益，保守档更偏可行率。
+    "aggressive": {
+        "tier": 5.0,
+        "feasible_rate": 3.0,
+        "feasible_fee": 8.0,
+        "risk_adjusted_fee": 3.0,
+    },
+    "balanced": {
+        "tier": 7.0,
+        "feasible_rate": 5.0,
+        "feasible_fee": 6.0,
+        "risk_adjusted_fee": 3.0,
+    },
+    "conservative": {
+        "tier": 9.0,
+        "feasible_rate": 7.0,
+        "feasible_fee": 4.0,
+        "risk_adjusted_fee": 2.0,
+    },
+}
+CONSTRAINT_PROFILE = "strict"  # strict / relaxed_for_training
+TRAINING_CONSTRAINT_PROFILE = "relaxed_for_training"
+CONSTRAINT_PROFILES = ("strict", "relaxed_for_training")
+STRICT_CONSTRAINTS = {
+    "fairness_floor": 0.90,
+    "oldest_coverage_floor": 0.90,
+    "risk_ceil": 0.30,
+    "top10_risk_ceil": 0.30,
+}
+RELAXED_TRAINING_CONSTRAINTS = {
+    "fairness_floor": 0.86,
+    "oldest_coverage_floor": 0.88,
+    "risk_ceil": 0.35,
+    "top10_risk_ceil": 0.35,
+}
 
 # ========== 训练策略 ==========
 PRETRAIN_POLICY = "none"  # none / fifo / fair_fee / mixed
@@ -120,6 +159,7 @@ PRETRAIN_EPOCHS = 0
 PRETRAIN_EPISODES_PER_EPOCH = 8
 CURRICULUM_ENABLED = False
 CURRICULUM_STAGE_EPISODES = (0.3, 0.7, 1.0)
+FAIRNESS_FIRST_CURRICULUM_ENABLED = True
 EVIDENCE_FORMAL_MIN_SEEDS = 3
 
 # ========== 新增基线参数 ==========
@@ -158,3 +198,31 @@ def effective_block_gas_limit(pool_size: int | None) -> int:
     ):
         return max(int(MAX_BLOCK_GAS * SMALL_POOL_STRESS_GAS_LIMIT_MULT), GAS_TRANSFER)
     return MAX_BLOCK_GAS
+
+
+def normalize_operating_mode(mode: str | None) -> str:
+    """校验并规范化运行档位。"""
+    if mode is None:
+        return OPERATING_MODE
+    mode_norm = str(mode).strip().lower()
+    if mode_norm not in OPERATING_MODES:
+        raise ValueError(f"invalid operating mode: {mode}. expected one of {OPERATING_MODES}")
+    return mode_norm
+
+
+def operating_mode_weights(mode: str | None = None) -> dict:
+    """返回三档策略对应的排序权重。"""
+    mode_norm = normalize_operating_mode(mode)
+    return dict(OPERATING_MODE_WEIGHTS[mode_norm])
+
+
+def resolve_constraints(profile: str | None = None, for_training: bool = False) -> dict:
+    """返回约束阈值配置。训练默认 relaxed，评估默认 strict。"""
+    if profile is None:
+        profile = TRAINING_CONSTRAINT_PROFILE if for_training else CONSTRAINT_PROFILE
+    profile_norm = str(profile).strip().lower()
+    if profile_norm == "strict":
+        return dict(STRICT_CONSTRAINTS)
+    if profile_norm == "relaxed_for_training":
+        return dict(RELAXED_TRAINING_CONSTRAINTS)
+    raise ValueError(f"invalid constraint profile: {profile}. expected one of {CONSTRAINT_PROFILES}")

@@ -1,4 +1,4 @@
-# 实验预验与正式运行命令（2026-03-23）
+# 实验预验与正式运行命令（2026-03-26）
 
 ## 目标
 
@@ -13,6 +13,8 @@
 - 当前工作目录为仓库根目录；
 - 使用 `python` 直接运行 `experiments/run_experiments.py`；
 - 当前脚本默认 `workers=1`，即串行运行；若要恢复并行，需显式传 `--workers`；
+- 正式主实验推荐显式传：`--operating-mode balanced --val-metric two_stage --fairness-first`；
+- 约束 profile 推荐：评估 `strict`，训练 `relaxed_for_training`（脚本默认已按该组合）；
 - 若环境尚未安装依赖，先执行：
 
 ```bash
@@ -98,57 +100,113 @@ python experiments/run_experiments.py \
 
 ## 四、正式实验命令
 
-### 4.1 正式主实验（推荐第一步先跑这个）
+### 4.1 正式主实验阶段 A（默认先跑 2200 episodes）
 
 用途：
 
-- 先获得主表、配对显著性和案例分析产物；
-- 优先判断 RL 是否在默认场景下取得稳定综合优势。
+- 保留大多数种子的主要收敛收益；
+- 先节约约 26.7% 训练预算（2200 vs 3000），再按需补跑。
 
 ```bash
 python experiments/run_experiments.py \
   --stages main \
   --seeds 42 123 456 789 2025 \
-  --episodes 3000 \
+  --episodes 2200 \
   --eval-episodes 1000 \
+  --operating-mode balanced \
+  --val-metric two_stage \
+  --fairness-first \
   --pool-size 300 \
   --output results_formal_main \
   --resume
 ```
 
-### 4.2 正式主实验 + 鲁棒性
+### 4.2 正式主实验阶段 B（仅补跑晚收敛 seed 到 3000）
+
+判定规则（建议）：`best_episode >= 1800` 视为晚收敛，需要补跑。
+
+```bash
+LATE_SEEDS=$(python - <<'PY'
+import glob, json
+out = "results_formal_main"
+late = []
+for p in sorted(glob.glob(f"{out}/seed_*/checkpoints/checkpoint_meta.json")):
+    seed = int(p.split("/seed_")[1].split("/")[0])
+    d = json.load(open(p))
+    best_ep = d.get("selection_rule", {}).get("best_episode", -1)
+    if isinstance(best_ep, (int, float)) and best_ep >= 1800:
+        late.append(str(seed))
+print(" ".join(late))
+PY
+)
+echo "late seeds: ${LATE_SEEDS:-none}"
+if [ -n "$LATE_SEEDS" ]; then
+  python experiments/run_experiments.py \
+    --stages main \
+    --seeds $LATE_SEEDS \
+    --episodes 3000 \
+    --eval-episodes 1000 \
+    --operating-mode balanced \
+    --val-metric two_stage \
+    --fairness-first \
+    --pool-size 300 \
+    --output results_formal_main
+fi
+```
+
+> 说明：此步不要加 `--resume`，否则已有结果会被直接跳过，无法补跑。
+
+### 4.3 正式主实验阶段 C（补跑后重建全 seed 聚合）
 
 用途：
 
-- 生成主实验与三类鲁棒性正式结果；
-- 用于论文第 5 章主表与鲁棒性表回填。
+- 不重训，只重建 `aggregated_main.json`、主表、显著性与 narrative 包；
+- 确保聚合结果包含所有 seed（含补跑后的 seed）。
 
 ```bash
 python experiments/run_experiments.py \
-  --stages main robustness \
+  --stages main \
   --seeds 42 123 456 789 2025 \
-  --episodes 3000 \
-  --eval-episodes 1000 \
+  --skip-train \
   --pool-size 300 \
-  --output results_formal_main_robust \
+  --output results_formal_main \
   --resume
 ```
 
-### 4.3 正式全链路（主实验 + 鲁棒性 + 消融）
+### 4.4 正式鲁棒性（复用主实验 checkpoint）
 
 用途：
 
-- 一次性跑完论文当前 V4 所需主要实验；
-- 适合确认主流程已稳定、机器资源允许长时间占用后使用。
+- 在主实验收敛策略完成后，补齐三类鲁棒性正式结果；
+- 避免重复主训练。
 
 ```bash
 python experiments/run_experiments.py \
-  --stages main robustness ablation \
+  --stages robustness \
   --seeds 42 123 456 789 2025 \
-  --episodes 3000 \
+  --skip-train \
   --eval-episodes 1000 \
+  --operating-mode balanced \
   --pool-size 300 \
-  --output results_formal_full \
+  --output results_formal_main \
+  --resume
+```
+
+### 4.5 正式消融（建议独立目录运行）
+
+用途：
+
+- 独立产出消融结果，避免和主实验/鲁棒性产物互相覆盖；
+- 支持后续补跑与归档。
+
+```bash
+python experiments/run_experiments.py \
+  --stages ablation \
+  --seeds 42 123 456 789 2025 \
+  --episodes 1000 \
+  --eval-episodes 300 \
+  --pool-size 300 \
+  --output results_formal_ablation \
   --resume
 ```
 
@@ -257,29 +315,83 @@ python experiments/run_experiments.py \
   --output results_dryrun_full
 ```
 
-### 第二步：正式主实验
+### 第二步：正式主实验（两阶段收敛）
 
 ```bash
 python experiments/run_experiments.py \
   --stages main \
   --seeds 42 123 456 789 2025 \
-  --episodes 3000 \
+  --episodes 2200 \
   --eval-episodes 1000 \
+  --operating-mode balanced \
+  --val-metric two_stage \
+  --fairness-first \
   --pool-size 300 \
   --output results_formal_main \
   --resume
 ```
 
-### 第三步：正式主实验 + 鲁棒性 + 消融
+```bash
+LATE_SEEDS=$(python - <<'PY'
+import glob, json
+out = "results_formal_main"
+late = []
+for p in sorted(glob.glob(f"{out}/seed_*/checkpoints/checkpoint_meta.json")):
+    seed = int(p.split("/seed_")[1].split("/")[0])
+    d = json.load(open(p))
+    best_ep = d.get("selection_rule", {}).get("best_episode", -1)
+    if isinstance(best_ep, (int, float)) and best_ep >= 1800:
+        late.append(str(seed))
+print(" ".join(late))
+PY
+)
+if [ -n "$LATE_SEEDS" ]; then
+  python experiments/run_experiments.py \
+    --stages main \
+    --seeds $LATE_SEEDS \
+    --episodes 3000 \
+    --eval-episodes 1000 \
+    --operating-mode balanced \
+    --val-metric two_stage \
+    --fairness-first \
+    --pool-size 300 \
+    --output results_formal_main
+fi
+python experiments/run_experiments.py \
+  --stages main \
+  --seeds 42 123 456 789 2025 \
+  --skip-train \
+  --pool-size 300 \
+  --output results_formal_main \
+  --resume
+```
+
+### 第三步：正式鲁棒性 + 消融
+
+先跑鲁棒性（复用主实验 checkpoint，不重训）：
 
 ```bash
 python experiments/run_experiments.py \
-  --stages main robustness ablation \
+  --stages robustness \
   --seeds 42 123 456 789 2025 \
-  --episodes 3000 \
+  --skip-train \
   --eval-episodes 1000 \
+  --operating-mode balanced \
   --pool-size 300 \
-  --output results_formal_full \
+  --output results_formal_main \
+  --resume
+```
+
+再跑消融（独立训练，建议独立目录）：
+
+```bash
+python experiments/run_experiments.py \
+  --stages ablation \
+  --seeds 42 123 456 789 2025 \
+  --episodes 1000 \
+  --eval-episodes 300 \
+  --pool-size 300 \
+  --output results_formal_ablation \
   --resume
 ```
 
@@ -296,6 +408,11 @@ python experiments/run_experiments.py \
 - `paired_significance_tests.json`
 - `case_study.json`
 - `behavior_probe.json`
+- `constrained_eval_summary.json`
+- `operating_points_summary.json`
+- `constraint_bottleneck_report.json`
+- `table_operating_points.tex`
+- `table_constraint_bottleneck.tex`
 
 若运行阶段包含 `robustness`，再检查：
 
@@ -332,7 +449,7 @@ python experiments/run_experiments.py \
 
 ### 10.1 配置裁剪
 
-- `main`：3 seeds（`42 123 789`），`episodes=3000`，`eval-episodes=1000`
+- `main`：3 seeds（`42 123 789`），阶段 A `episodes=2200`，阶段 B 仅对晚收敛 seed 补跑 `episodes=3000`，`eval-episodes=1000`
 - `robustness`：2 seeds（`42 123`），`eval-episodes=500`
 - `ablation`：2 seeds（`42 123`），`episodes=1000`，`eval-episodes=300`
 - GPU 并行建议：`workers=3`，`max-gpu-workers=3`
@@ -345,8 +462,54 @@ python experiments/run_experiments.py \
 python experiments/run_experiments.py \
   --stages main \
   --seeds 42 123 789 \
-  --episodes 3000 \
+  --episodes 2200 \
   --eval-episodes 1000 \
+  --operating-mode balanced \
+  --val-metric two_stage \
+  --fairness-first \
+  --pool-size 300 \
+  --workers 3 \
+  --max-gpu-workers 3 \
+  --device cuda:0 \
+  --output results_formal_min_fast \
+  --resume
+```
+
+#### 步骤 A2：仅补跑晚收敛 seed 到 3000（阈值：best\_episode>=1800）
+
+```bash
+LATE_SEEDS=$(python - <<'PY'
+import glob, json
+out = "results_formal_min_fast"
+late = []
+for p in sorted(glob.glob(f"{out}/seed_*/checkpoints/checkpoint_meta.json")):
+    seed = int(p.split("/seed_")[1].split("/")[0])
+    d = json.load(open(p))
+    best_ep = d.get("selection_rule", {}).get("best_episode", -1)
+    if isinstance(best_ep, (int, float)) and best_ep >= 1800:
+        late.append(str(seed))
+print(" ".join(late))
+PY
+)
+if [ -n "$LATE_SEEDS" ]; then
+  python experiments/run_experiments.py \
+    --stages main \
+    --seeds $LATE_SEEDS \
+    --episodes 3000 \
+    --eval-episodes 1000 \
+    --operating-mode balanced \
+    --val-metric two_stage \
+    --fairness-first \
+    --pool-size 300 \
+    --workers 3 \
+    --max-gpu-workers 3 \
+    --device cuda:0 \
+    --output results_formal_min_fast
+fi
+python experiments/run_experiments.py \
+  --stages main \
+  --seeds 42 123 789 \
+  --skip-train \
   --pool-size 300 \
   --workers 3 \
   --max-gpu-workers 3 \

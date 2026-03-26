@@ -13,7 +13,7 @@ from env import TxOrderingEnv
 from networks import ActorCritic
 from baselines import run_baseline
 from metrics import (compute_all_metrics, constrained_ranking, pareto_dominance_rate,
-                     pareto_dominates, summary_metric_bundle)
+                     pareto_dominates, summary_metric_bundle, operating_point_rank)
 from device_utils import resolve_device
 from method_registry import BASELINE_METHOD_IDS, display_name
 from transaction import Transaction, generate_pool
@@ -154,22 +154,33 @@ def build_fairness_decomposition(raw: dict[str, list[dict]]) -> dict:
 
 def build_constrained_eval_summary(raw: dict[str, list[dict]],
                                    constraints: dict | None = None) -> dict:
-    cons = constraints or {
-        "fairness_floor": C.VALIDATION_FAIRNESS_FLOOR,
-        "oldest_coverage_floor": C.VALIDATION_OLDEST_COVERAGE_FLOOR,
-        "risk_ceil": C.VALIDATION_RISK_CEIL,
-        "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,
-    }
+    if constraints is None:
+        cons = C.resolve_constraints(profile="strict", for_training=False) if hasattr(C, "resolve_constraints") else {
+            "fairness_floor": C.VALIDATION_FAIRNESS_FLOOR,
+            "oldest_coverage_floor": C.VALIDATION_OLDEST_COVERAGE_FLOOR,
+            "risk_ceil": C.VALIDATION_RISK_CEIL,
+            "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,
+        }
+    else:
+        cons = constraints
     payload = {
         "score_policy_version": C.SCORE_POLICY_VERSION,
         "ranking_policy_version": C.RANKING_POLICY_VERSION,
+        "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "operating_mode": getattr(C, "OPERATING_MODE", "balanced"),
         "constraints": cons,
         "methods": {},
     }
     for method, seq in raw.items():
-        bundle = summary_metric_bundle(seq, constraints=cons, target_metric="block_fee_norm")
+        bundle = summary_metric_bundle(
+            seq,
+            constraints=cons,
+            target_metric="block_fee_norm",
+            mode=getattr(C, "OPERATING_MODE", "balanced"),
+        )
         payload["methods"][method] = {
             "feasible_rate": bundle["feasible_rate"],
+            "feasible_rate_tier": bundle["feasible_rate_tier"],
             "feasible_fee_mean": bundle["feasible_set_fee_mean"],
             "feasible_fee_std": bundle["feasible_set_fee_std"],
             # 兼容旧字段名
@@ -180,15 +191,86 @@ def build_constrained_eval_summary(raw: dict[str, list[dict]],
             "risk_adjusted_fee_mean": bundle["risk_adjusted_fee_mean"],
             "risk_adjusted_fee_std": bundle["risk_adjusted_fee_std"],
             "infeasible_count": bundle["infeasible_count"],
+            "violation_count": bundle["violation_count"],
             "n_episodes": bundle["n_episodes"],
+            "two_stage_selection_score": bundle["two_stage_selection_score"],
+            "selection_policy_version": bundle["selection_policy_version"],
+            "operating_mode": bundle["operating_mode"],
             "violation_breakdown": bundle["violation_breakdown"],
             "constraint_violation_top1": bundle["constraint_violation_top1"],
+            "effective_variance_checks": bundle["effective_variance_checks"],
+            "low_variance_flags": bundle["low_variance_flags"],
         }
     payload["ranking"] = constrained_ranking(
         payload["methods"],
         min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+        mode=getattr(C, "OPERATING_MODE", "balanced"),
     )
     return payload
+
+
+def build_operating_points_summary(constrained_summary: dict) -> dict:
+    methods = constrained_summary.get("methods", {})
+    mode_list = ["aggressive", "balanced", "conservative"]
+    payload = {
+        "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "default_mode": getattr(C, "OPERATING_MODE", "balanced"),
+        "constraints": constrained_summary.get("constraints", {}),
+        "modes": {},
+    }
+    for mode in mode_list:
+        ranked_rows = operating_point_rank(
+            methods,
+            mode=mode,
+            min_feasible_rate=C.CONSTRAINED_RANK_MIN_FEASIBLE_RATE,
+        )
+        top_row = ranked_rows[0] if ranked_rows else None
+        payload["modes"][mode] = {
+            "ranking": [row["method"] for row in ranked_rows],
+            "top_method": top_row["method"] if top_row else None,
+            "top_method_metrics": {
+                "feasible_rate": top_row["feasible_rate"],
+                "feasible_rate_tier": top_row["feasible_rate_tier"],
+                "feasible_set_fee_mean": top_row["feasible_set_fee_mean"],
+                "risk_adjusted_fee_mean": top_row["risk_adjusted_fee_mean"],
+                "two_stage_selection_score": top_row["two_stage_selection_score"],
+            } if top_row else {},
+            "rows": ranked_rows,
+        }
+    return payload
+
+
+def build_constraint_bottleneck_report(constrained_summary: dict) -> dict:
+    methods = constrained_summary.get("methods", {})
+    totals = {
+        "fairness_floor": 0,
+        "oldest_coverage_floor": 0,
+        "risk_ceil": 0,
+        "top10_risk_ceil": 0,
+        "any_violation": 0,
+    }
+    method_report = {}
+    for method, item in methods.items():
+        breakdown = item.get("violation_breakdown", {}) or {}
+        for key in totals:
+            totals[key] += int(breakdown.get(key, 0))
+        method_report[method] = {
+            "feasible_rate": float(item.get("feasible_rate", 0.0)),
+            "infeasible_count": int(item.get("infeasible_count", 0)),
+            "violation_count": int(item.get("violation_count", item.get("infeasible_count", 0))),
+            "n_episodes": int(item.get("n_episodes", 0)),
+            "constraint_violation_top1": item.get("constraint_violation_top1", "none"),
+            "violation_breakdown": breakdown,
+        }
+    top1 = "none"
+    if any(v > 0 for v in totals.values()):
+        top1 = max(("fairness_floor", "oldest_coverage_floor", "risk_ceil", "top10_risk_ceil"), key=lambda k: totals[k])
+    return {
+        "constraints": constrained_summary.get("constraints", {}),
+        "methods": method_report,
+        "global_violation_totals": totals,
+        "global_constraint_bottleneck_top1": top1,
+    }
 
 
 def build_pareto_outputs(raw: dict[str, list[dict]]) -> tuple[dict, dict]:
@@ -560,13 +642,13 @@ def main():
             indent=2,
             ensure_ascii=False,
         )
+    constrained_summary = build_constrained_eval_summary(raw_results)
     with open(os.path.join(args.output, "constrained_eval_summary.json"), "w") as f:
-        json.dump(
-            build_constrained_eval_summary(raw_results),
-            f,
-            indent=2,
-            ensure_ascii=False,
-        )
+        json.dump(constrained_summary, f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "operating_points_summary.json"), "w") as f:
+        json.dump(build_operating_points_summary(constrained_summary), f, indent=2, ensure_ascii=False)
+    with open(os.path.join(args.output, "constraint_bottleneck_report.json"), "w") as f:
+        json.dump(build_constraint_bottleneck_report(constrained_summary), f, indent=2, ensure_ascii=False)
     pareto_payload, dominance_matrix = build_pareto_outputs(raw_results)
     with open(os.path.join(args.output, "pareto_episode_analysis.json"), "w") as f:
         json.dump(pareto_payload, f, indent=2, ensure_ascii=False)

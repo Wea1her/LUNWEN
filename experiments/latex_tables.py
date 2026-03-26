@@ -243,11 +243,58 @@ def generate_constrained_main_table(payload: dict) -> str:
         cmean = "--" if cmean_raw is None else f"${float(cmean_raw):.4f}$"
         cstd = "--" if cstd_raw is None else f"${float(cstd_raw):.4f}$"
         infeasible = int(v.get("infeasible_count", 0))
+        violation_count = int(v.get("violation_count", infeasible))
         top1 = str(v.get("constraint_violation_top1", "none")).replace("_", r"\_")
         lines.append(
-            f"{latex_name(method_id)} & {feas} & {cmean} & {cstd} & ${infeasible}$ & {top1} \\\\"
+            f"{latex_name(method_id)} & {feas} & {cmean} & {cstd} & ${infeasible}$ & ${violation_count}$ & {top1} \\\\"
         )
     return "\n".join(lines) + "\n"
+
+
+def generate_operating_points_table(payload: dict) -> str:
+    """生成三档 operating points 对比表。"""
+    modes = payload.get("modes", {})
+    mode_order = ["aggressive", "balanced", "conservative"]
+    lines = []
+    for mode in mode_order:
+        row = modes.get(mode, {})
+        top_method = row.get("top_method")
+        metric = row.get("top_method_metrics", {})
+        if top_method is None:
+            lines.append(f"{mode} & -- & -- & -- & -- \\\\")
+            continue
+        top_method_latex = latex_name(top_method) if top_method in MAIN_METHOD_ORDER else top_method
+        feas = metric.get("feasible_rate", 0.0)
+        fee = metric.get("feasible_set_fee_mean")
+        risk_adj = metric.get("risk_adjusted_fee_mean")
+        fee_str = "--" if fee is None else f"${float(fee):.4f}$"
+        risk_str = "--" if risk_adj is None else f"${float(risk_adj):.4f}$"
+        lines.append(
+            f"{mode} & {top_method_latex} & ${float(feas):.4f}$ & {fee_str} & {risk_str} \\\\"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def generate_constraint_bottleneck_table(payload: dict) -> str:
+    """生成各方法约束瓶颈表。"""
+    methods = payload.get("methods", {})
+    present = [m for m in MAIN_METHOD_ORDER if m in methods]
+    lines = []
+    for method_id in present:
+        item = methods[method_id]
+        feas = float(item.get("feasible_rate", 0.0))
+        violation_count = int(item.get("violation_count", 0))
+        infeasible_count = int(item.get("infeasible_count", 0))
+        top1 = str(item.get("constraint_violation_top1", "none")).replace("_", r"\_")
+        lines.append(
+            f"{latex_name(method_id)} & ${feas:.4f}$ & ${violation_count}$ & ${infeasible_count}$ & {top1} \\\\"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def append_primary_decision_rule_note(table_rows: str) -> str:
+    """在表格末尾追加主决策规则说明。"""
+    return table_rows + "% NOTE: Primary decision rule: feasible-rate first, feasible-set fee second.\n"
 
 
 def append_exploratory_note(table_rows: str, evidence_level: str) -> str:

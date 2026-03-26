@@ -1,7 +1,4 @@
-# 实验框架代码改动计划（2026-03-24，面向“论文整体叙事一致性”）
-
-> 输入依据：`results_dryrun_gpu_20260324_defaultgpu` 最新 dryrun。  
-> 目标：将代码框架从“能跑 + 局部指标好看”升级为“可稳定支撑论文叙事：高收益下的可控风险折中，并在约束协议下具备一致优势”。
+# 实验框架代码改动计划（2026-03-26）
 
 ---
 
@@ -361,3 +358,42 @@
 - 你问“三项尽可能最优先优化哪个”：框架层将其固化为**fairness-first**（先提可行率，再收敛收益）。
 - 你问“平时最优怎么选”：框架层将输出三档 operating points，默认给 `balanced`。
 - 这样后续实验不再靠人工解释，而是由代码协议直接产出可执行结论。
+
+
+## 10. 实验预期结果（你可以直接拿来做里程碑）
+
+### 10.1 Phase A（调参优先）预期
+
+在不改大框架前，预期出现以下变化：
+
+1. `balanced` 模式下 `feasible_rate` 明显上升（相对当前基线提升为主要目标）；
+2. `fairness_floor` 仍可能是 top1 违约项，但违约次数占比应下降；
+3. `block_fee_mean` 可能有小幅回落，但 `feasible_set_fee_mean` 与 `risk_adjusted_fee` 应更稳定；
+4. 三档 operating points（A/B/C）之间形成清晰梯度：
+   - Aggressive：fee 最高，可行率较低；
+   - Balanced：可行率与收益折中最优（推荐默认）；
+   - Conservative：风险最低/公平最高，但收益最低。
+
+### 10.2 Phase B（条件触发的小框架改动）预期
+
+若 Phase A 两轮后仍受 fairness 瓶颈限制，进入 Phase B 后预期：
+
+1. `constraint_bottleneck_report.json` 中 fairness 占比继续下降；
+2. `balanced` 档与 `conservative` 档的 gap 缩小（说明公平提升不再依赖极端保守策略）；
+3. 在不显著恶化 risk 的前提下，`feasible_rate` 进入稳定高位区间；
+4. 论文主叙事从“单点最好”转为“可控 Pareto 前沿 + 可切换部署策略”。
+
+### 10.3 最终交付层预期（报告可读性）
+
+1. 每次正式实验都能自动产出：
+   - `table_main_core.tex`
+   - `table_main_fullmetrics.tex`
+   - `table_main_constraints.tex`
+   - `table_operating_points.tex`
+   - `table_constraint_bottleneck.tex`
+2. 读者可以在一页内看到：
+   - 谁在收益最强；
+   - 谁在公平/风险更稳；
+   - 默认部署为什么选 `balanced`。
+
+> 一句话预期：实验最终应从“指标拼盘”升级为“可行率优先、三档可部署、叙事可复现”的结果体系。
