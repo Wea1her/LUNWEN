@@ -1,11 +1,25 @@
 % chapters/journal/05-experiments.tex
-% 第5章 实验设计与分析
+% 第5章 实验设计与结果分析
 
-\section{实验设计与分析}
+\section{实验设计与结果分析}
 
-\subsection{仿真环境}
+\subsection{研究问题与实验目标}
 
-本文构建了一个可配置的通用交易排序仿真环境，用于模拟以太坊区块构建过程。与直接使用以太坊测试网或 Geth 私链相比，仿真环境具有两方面优势：一是训练效率高，单次区块构建回合的仿真时间在毫秒级别，可支持大规模并行采样；二是参数可控，能够精确调节候选交易池规模、风险交易比例等关键变量，便于设计对照实验。环境的核心参数如表~\ref{tab:env_params} 所示。
+本文实验围绕四个研究问题展开：
+
+（1）\textbf{RQ1：主实验有效性。} 在统一默认场景下，本文方法能否相较于非学习型排序方法取得更优的收益--等待时间均衡--风险控制综合折中。
+
+（2）\textbf{RQ2：泛化与鲁棒性。} 当风险交易比例、候选池规模和风险手续费倍率变化时，本文方法是否在多数场景保持综合折中领先，并能够识别其失效边界。
+
+（3）\textbf{RQ3：组件必要性。} 奖励函数分项与模型关键结构（序列摘要、动作掩码、\texttt{STOP}）是否分别对性能有独立贡献。
+
+（4）\textbf{RQ4：行为可解释性。} 本文策略是否表现出超越静态线性打分的条件决策迹象，能够在位置敏感风险与等待时间均衡之间进行情境化取舍。
+
+\subsection{实验设置}
+
+\subsubsection{仿真环境与统一默认配置}
+
+本文采用可配置交易排序仿真环境模拟区块构建过程。该环境的设计参照 Layer~2 Sequencer 面临的排序决策场景：单一排序节点从候选交易池中逐笔选取交易并确定执行顺序，需要在区块 Gas 容量、Nonce 依赖等约束下平衡收益与公平性目标。默认配置采用中载主场景：候选交易池大小 $N{=}300$、风险交易比例 $p_{\text{risk}}{=}15\%$、区块 Gas 上限 $30{,}000{,}000$。交易池生成使用 \texttt{correlated\_v1} 模式：先按拥堵状态采样到达过程，再联合生成风险概率、手续费、历史确认延迟与历史成功率，使 \texttt{fee/risk/arrival/hist\_delay} 之间具备可解释的统计相关性。环境关键参数如表~\ref{tab:env_params} 所示。
 
 \begin{table}[htbp]
 \centering
@@ -16,81 +30,244 @@
 参数 & 符号 & 取值 \\
 \midrule
 区块 Gas 上限 & $G_{\max}$ & 30{,}000{,}000 \\
-候选交易池大小 & $N$ & 50--200 \\
-交易 Gas 消耗范围 & $g_i$ & 21{,}000--500{,}000 \\
-手续费分布 & -- & 对数正态分布 \\
-风险交易比例 & $p_{\text{risk}}$ & 5\%--30\% \\
-交易到达时间 & $t_i^{\text{arr}}$ & 泊松过程 \\
+候选交易池大小（默认） & $N$ & 300 \\
+候选池规模范围（鲁棒性） & $N$ & $\{100, 200, 300, 500\}$ \\
+风险交易比例（默认） & $p_{\text{risk}}$ & 15\% \\
+风险比例范围（鲁棒性） & $p_{\text{risk}}$ & $\{5\%, 10\%, 15\%, 20\%, 30\%\}$ \\
+风险费率基准系数（默认） & $\kappa$ & 2.0 \\
+倍率范围（鲁棒性） & $\kappa$ & $\{1.2, 1.5, 2.0, 3.0\}$ \\
+交易池生成模式 & -- & correlated\_v1 \\
+到达过程 & -- & 分段泊松过程（拥堵状态驱动） \\
+手续费生成 & -- & 对数正态基底 + 风险/拥堵/延迟耦合 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-仿真环境在每个回合开始时，从预设分布中采样生成候选交易集合。每笔交易的手续费参数服从对数正态分布，以模拟实际以太坊交易手续费的右偏特征。Gas 消耗根据交易类型确定：简单转账交易固定为 21{,}000 Gas，合约调用交易从 $[50{,}000, 500{,}000]$ 区间均匀采样。交易到达时间由泊松过程生成，平均到达间隔设为 1 秒。
+\subsubsection{训练与统计配置}
 
-风险交易按预设比例 $p_{\text{risk}}$ 注入候选集合。风险交易的风险评分从均匀分布 $U(0.5, 1.0)$ 中采样，普通交易的风险评分从 $U(0, 0.3)$ 中采样，两类交易在风险评分上存在明显的分布差异。风险交易的手续费通常偏高，以模拟实际场景中 MEV 攻击交易通过提高手续费争取优先打包的行为。环境支持调节 $p_{\text{risk}}$ 以模拟不同风险负载场景，从低风险（$p_{\text{risk}} = 5\%$）到高风险（$p_{\text{risk}} = 30\%$）。
-
-交易间的依赖关系通过 Nonce 约束建模：同一发送地址的多笔交易必须按 Nonce 从小到大的顺序被选入执行序列。仿真环境在每个时间步自动检查依赖约束，仅将满足约束的交易保留在合法动作集合中。
-
-\subsection{基线方法与评价指标}
-
-本文选取以下三种基线方法进行对比：
-
-（1）FIFO 排序：按交易到达时间顺序依次打包，直至区块 Gas 用尽。该方法不做任何优化，代表了最朴素的公平排序方案。
-
-（2）Gas 优先排序：按交易手续费从高到低排列并依次打包，为当前以太坊客户端的默认排序策略。该方法追求收益最大化，但不考虑公平性和风险。
-
-（3）启发式风险感知排序（Heuristic）：在 Gas 优先排序基础上，对风险评分超过阈值 $\tau_{\text{risk}} = 0.5$ 的交易降低优先级，将其排列在区块中间位置（即非头尾区域）。该方法代表了基于规则的风险感知排序方案。
-
-评价指标包括以下四项。区块手续费收益（Block Fee Revenue）定义为区块内所有交易手续费之和，以 Gwei 为单位，衡量排序策略对区块构建者的经济效益。确认公平性指数（Fairness Index）采用 Jain 公平性指数衡量交易等待时间分布的均匀程度：
-
-\begin{equation}
-  J = \frac{(\sum_{i=1}^K w_i)^2}{K \cdot \sum_{i=1}^K w_i^2}
-\end{equation}
-
-其中 $w_i$ 为第 $i$ 笔被打包交易的等待时间，$K$ 为打包交易总数。$J$ 的取值范围为 $[1/K, 1]$，越接近 1 表示等待时间分布越均匀，排序越公平。风险暴露度（Risk Exposure）定义为风险评分超过 $\tau_{\text{risk}}$ 的交易出现在区块前 10\% 和后 10\% 位置的比例，越低表示高风险交易被放置在敏感位置的可能性越小。Gas 利用率（Gas Utilization）定义为区块实际消耗 Gas 总量占区块 Gas 上限 $G_{\max}$ 的比例，反映区块空间的利用效率。
-
-\subsection{主要实验结果}
-
-表~\ref{tab:main_results} 展示了各方法在默认参数配置（$N=100$，$p_{\text{risk}}=15\%$）下的实验结果。
+PPO 训练超参数与统计设置如表~\ref{tab:train_stats} 所示。本文实验协议以 5 个独立随机种子作为正式统计目标，每个种子独立训练并独立评估，主表结果按跨种子均值与标准差汇总；当阶段性执行尚未达到该门槛时，结果按探索性证据报告，并在结论力度上降级为“现象性支持”。主实验、三类鲁棒性实验、奖励消融与结构消融均在各自种子预生成的共享评估池上完成，同一 seed 下所有方法与消融变体复用完全一致的一批 episode 交易池。训练阶段预生成固定验证池并按固定间隔进行周期评估，按验证指标选出 \texttt{best\_model.pt}；正式评估统一加载该检查点，\texttt{checkpoint\_meta.json} 记录完整选模规则与关键参数。
 
 \begin{table}[htbp]
 \centering
-\caption{各方法在默认配置下的性能对比}
+\caption{训练与统计配置}
+\label{tab:train_stats}
+\begin{tabular}{lll}
+\toprule
+类别 & 参数 & 取值 \\
+\midrule
+训练配置 & 训练回合数 & 3{,}000 \\
+训练配置 & 评估回合数 & 1{,}000 \\
+训练配置 & Actor 学习率 & $3 \times 10^{-4}$ \\
+训练配置 & Critic 学习率 & $1 \times 10^{-3}$ \\
+训练配置 & $\gamma,\lambda,\epsilon$ & $(0.99, 0.95, 0.2)$ \\
+训练配置 & 选模规则 & 固定验证池周期评估（\texttt{hypervolume}） \\
+奖励权重 & $(\alpha,\beta,\gamma_r,\eta)$ & $(1.0, 0.3, 0.5, 0.1)$ \\
+统计配置 & 随机种子 & $\{42,123,456,789,2025\}$ \\
+统计配置 & 主表统计 & mean $\pm$ std \\
+统计配置 & 显著性检验 & episode 级 paired $t$ + Wilcoxon \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{基线方法}
+
+本文保留并固定以下五类基线，所有基线均在相同交易池、相同 Nonce 约束和相同 Gas 容量约束下评估。
+
+（1）\textbf{FIFO}：按到达时间排序。
+
+（2）\textbf{Gas Priority}：按手续费从高到低排序。
+
+（3）\textbf{Heuristic Risk-Aware}：Gas 优先后将高风险交易插入区块中间位置。
+
+（4）\textbf{Fee-Risk Linear}：线性评分
+\begin{equation}
+  s(tx)=\lambda_f \cdot f_{\text{norm}} - \lambda_r \cdot r_{\text{risk}}
+\end{equation}
+默认 $\lambda_f{=}1.0,\lambda_r{=}0.5$。
+
+（5）\textbf{Fair-Fee Greedy}：收益与等待时间双目标评分
+\begin{equation}
+  s(tx)=\lambda_f \cdot f_{\text{norm}} + \lambda_w \cdot w_{\text{norm}}
+\end{equation}
+默认 $\lambda_f{=}1.0,\lambda_w{=}0.5$。
+
+\subsubsection{评价指标}
+
+本文采用六项主指标与两项辅助指标：
+
+（1）区块手续费收益（$\uparrow$）；
+
+（2）等待时间均衡性（Jain 指数，$\uparrow$）；
+
+（3）风险暴露度（头尾敏感区高风险占比，$\downarrow$）；
+
+（4）Gas 利用率（$\uparrow$）；
+
+（5）风险交易平均相对位置（目标接近 0.5）；
+
+（6）打包比例（$\uparrow$）；
+
+（7）Top-10\% Risk Ratio（头部 10\% 位置高风险占比，$\downarrow$）；
+
+（8）Late-Arrival Promotion Rate（后到达高手续费交易提前打包比例，$\uparrow$）。
+
+\subsection{主实验结果（RQ1）}
+
+主实验场景固定为 $N{=}300,\;p_{\text{risk}}{=}15\%,\;\kappa{=}2.0$。比较对象为本文方法与五类基线。结果如表~\ref{tab:main_results} 所示。
+
+\begin{table*}[htbp]
+\centering
+\caption{主实验结果（$N{=}300,\;p_{\text{risk}}{=}15\%$）}
 \label{tab:main_results}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lcccccccc}
+\toprule
+方法 & 收益 $\uparrow$ & Jain $\uparrow$ & 风险暴露 $\downarrow$ & Gas 利用 $\uparrow$ & 风险位置 $\approx 0.5$ & 打包比 $\uparrow$ & Top-10\% 风险 $\downarrow$ & Late-Promo $\uparrow$ \\
+\midrule
+FIFO             & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Gas Priority     & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Heuristic        & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Fee-Risk Linear  & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Fair-Fee Greedy  & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+本文方法         & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+主实验分析围绕四个维度展开。收益维度检验本文方法与 Gas Priority 的差距是否可控；等待时间均衡维度检验本文方法对 Jain 指数的改善程度；风险控制维度同时关注风险暴露、风险交易平均位置与 Top-10\% 风险比例；效率维度通过 Gas 利用率与打包比例排除“通过少选交易规避风险”的伪提升。主结论采用“综合折中”口径，即本文方法在收益与综合指标上领先即可支持有效性论点，而不要求在公平性与风险单项指标上同时达到全局最优。
+
+\subsection{鲁棒性实验（RQ2）}
+
+\subsubsection{风险交易比例鲁棒性}
+
+固定 $N{=}300,\;\kappa{=}2.0$，令 $p_{\text{risk}} \in \{5\%,10\%,15\%,20\%,30\%\}$。重点考察收益差距是否随风险负载扩大、风险暴露增长速率是否受控、Jain 指数是否保持稳定。
+
+\begin{figure}[htbp]
+\centering
+% \includegraphics[width=0.92\linewidth]{figures/v3_robust_risk_ratio.pdf}
+\caption{不同风险交易比例下的关键指标变化}
+\label{fig:robust_risk_ratio}
+\end{figure}
+
+\subsubsection{候选池规模鲁棒性}
+
+固定 $p_{\text{risk}}{=}15\%,\;\kappa{=}2.0$，令 $N \in \{100,200,300,500\}$。该实验对应轻载、中载、重载排序压力变化，重点检验方法在动作空间尺度变化下的稳定性。
+
+\begin{figure}[htbp]
+\centering
+% \includegraphics[width=0.92\linewidth]{figures/v3_robust_pool_size.pdf}
+\caption{不同候选池规模下的关键指标变化}
+\label{fig:robust_pool_size}
+\end{figure}
+
+\subsubsection{风险手续费倍率鲁棒性}
+
+固定 $N{=}300,\;p_{\text{risk}}{=}15\%$，令 $\kappa \in \{1.2,1.5,2.0,3.0\}$。当风险交易收益诱惑增强时，该实验用于验证策略是否仍能抑制头尾敏感区风险暴露。
+
+\begin{figure}[htbp]
+\centering
+% \includegraphics[width=0.92\linewidth]{figures/v3_robust_fee_multiplier.pdf}
+\caption{不同风险手续费倍率下的关键指标变化}
+\label{fig:robust_fee_multiplier}
+\end{figure}
+
+\subsection{消融实验（RQ3）}
+
+\subsubsection{奖励消融}
+
+奖励消融包含四个变体：FeeOnly、Fee+Fair、Fee+Risk、Full Reward。所有奖励变体在同一 seed 下复用相同共享评估池，结果如表~\ref{tab:ablation_reward} 所示。
+
+\begin{table}[htbp]
+\centering
+\caption{奖励消融结果}
+\label{tab:ablation_reward}
 \begin{tabular}{lcccc}
 \toprule
-方法 & 区块收益 & 公平性指数 & 风险暴露度 & Gas 利用率 \\
+奖励变体 & 收益 $\uparrow$ & Jain $\uparrow$ & 风险暴露 $\downarrow$ & Gas 利用 $\uparrow$ \\
 \midrule
-FIFO        & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-Gas 优先    & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-Heuristic   & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-本文方法    & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+FeeOnly       & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Fee+Fair      & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Fee+Risk      & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Full Reward   & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\TODO{在实验数据就绪后填入具体数值，并撰写结果分析段落。分析要点：（1）与 Gas 优先相比，本文方法在收益方面的表现；（2）与 FIFO 相比，公平性指标的差异；（3）与 Heuristic 相比，风险暴露度的改善；（4）Gas 利用率是否保持在合理水平。}
+该实验用于确认三类奖励项在多目标平衡中的独立贡献。若 Full Reward 在综合指标上占优，可说明收益、均衡与风险惩罚具有互补作用。
 
-\subsection{鲁棒性分析}
+\subsubsection{结构消融}
 
-为验证本文方法在不同条件下的稳定性，设计了风险负载变化实验。将风险交易比例 $p_{\text{risk}}$ 分别设为 5\%、10\%、15\%、20\% 和 30\%，在每种配置下运行各方法并记录指标。
+结构消融包含 No-SeqSummary、No-ActionMask、No-STOP 与 Full Model 四个变体。所有结构变体在同一 seed 下复用相同共享评估池，结果如表~\ref{tab:ablation_struct} 所示。
 
 \begin{table}[htbp]
 \centering
-\caption{不同风险负载下各方法的区块收益与风险暴露度}
-\label{tab:robustness}
-\begin{tabular}{lcccccc}
+\caption{结构消融结果}
+\label{tab:ablation_struct}
+\begin{tabular}{lcccc}
 \toprule
-\multirow{2}{*}{方法} & \multicolumn{3}{c}{区块收益} & \multicolumn{3}{c}{风险暴露度} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7}
- & 5\% & 15\% & 30\% & 5\% & 15\% & 30\% \\
+模型变体 & 收益 $\uparrow$ & Jain $\uparrow$ & 风险暴露 $\downarrow$ & Gas 利用 $\uparrow$ \\
 \midrule
-FIFO        & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-Gas 优先    & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-Heuristic   & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
-本文方法    & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+No-SeqSummary & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+No-ActionMask & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+No-STOP       & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
+Full Model    & \TODO{} & \TODO{} & \TODO{} & \TODO{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\TODO{在实验数据就绪后填入具体数值，并撰写鲁棒性分析段落。重点关注：（1）随风险负载增大，各方法性能变化趋势；（2）本文方法在高风险负载下是否仍保持优势；（3）训练收敛曲线的稳定性。}
+No-ActionMask 用于评估合法动作先验的必要性；No-STOP 用于评估主动终止自由度对风险控制的影响；No-SeqSummary 用于评估序列上下文信息对逐笔决策的贡献。
+
+\subsection{行为解释实验（RQ4）}
+
+\subsubsection{典型区块排序案例}
+
+从评估集中选取三类代表性交易池样本：高风险密集场景、高手续费竞争场景、Nonce 约束明显场景。对比 FIFO、Gas Priority、Heuristic 与本文方法在同一池上的排序序列，重点解释三类行为：高风险交易是否被推离头尾敏感区、长等待交易是否被提前确认、高手续费交易是否仍被保留在优势位置。
+
+\begin{table}[htbp]
+\centering
+\caption{典型案例行为解释模板}
+\label{tab:case_study}
+\begin{tabular}{lccc}
+\toprule
+场景 & 头尾高风险变化 & 长等待交易提前确认 & 备注 \\
+\midrule
+高风险密集 & \TODO{} & \TODO{} & \TODO{} \\
+高费竞争 & \TODO{} & \TODO{} & \TODO{} \\
+Nonce 约束明显 & \TODO{} & \TODO{} & \TODO{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{与线性基线的一致性检验}
+
+为检验策略是否退化为静态线性打分，本文对策略动作偏好进行后验拟合，以手续费、风险评分、到达时间为自变量构建线性模型，并比较其拟合策略与 RL 策略在主指标上的差距。若 RL 显著优于线性拟合策略，可支持“策略学习到非线性条件决策”的结论；若拟合尚未完成或差异不显著，则仅报告行为差异现象，不给出“已学习非线性规律”的强结论。
+
+\begin{table}[htbp]
+\centering
+\caption{线性一致性检验模板}
+\label{tab:linear_check}
+\begin{tabular}{lccc}
+\toprule
+模型 & 拟合优度($R^2$) & 主实验收益差距 & 风险暴露差距 \\
+\midrule
+线性拟合策略 vs RL & \TODO{} & \TODO{} & \TODO{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{统计报告规范}
+
+本文实验统一采用分层统计口径：达到正式门槛时按多种子均值 $\pm$ 标准差报告，并给出共享评估池对齐后的 episode 级 paired $t$ 与 Wilcoxon signed-rank 检验；未达到正式门槛时，结果标注为探索性证据，仅用于支持趋势判断，不用于支持“全面领先”或“稳定最优”结论。显著性检验仅在统计依赖可用且存在可配对 episode 记录时执行。
+
+\subsection{局限性与有效性威胁}
+
+本文结果应理解为可控仿真环境中的方法可行性证据，而非对真实链上部署效果的直接预测。实验中的交易池生成虽然采用 \texttt{correlated\_v1} 机制并引入手续费、风险评分、到达过程、历史成功率和历史确认延迟之间的统计耦合，但其本质仍是参数化仿真分布。这种设定有助于在统一协议下比较不同排序方法，但不等同于真实内存池中由协议规则、市场博弈和链上事件共同形成的数据分布。
+
+当前环境聚焦通用候选池排序验证，显式建模的约束主要包括 Gas 容量、Nonce 依赖、位置敏感风险和提前终止行为，尚未直接模拟 DEX/AMM 价格状态、滑点反馈、池内流动性变化和真实执行回滚机制。因此，本文结论更适用于抽象区块构建场景下的相对方法比较，而不能直接外推为具体 DeFi 应用中的最终收益或防护效果。
+
+统计显著性分析当前基于共享评估池上的 episode 级配对样本，反映的是同一仿真协议下方法间相对差异；跨随机种子统计则用于刻画训练稳定性。二者均不等同于跨真实时间区间、跨市场状态或跨数据源的统计外推能力。后续工作需要结合真实链上数据回放与更复杂执行环境，对本文方法的泛化能力和实际部署价值做进一步验证。
+
+\subsection{本章小结}
+
+本章按实验方案重构了实验部分：统一默认配置，明确 RQ1--RQ4 与实验矩阵映射，补齐三组鲁棒性、奖励与结构消融、行为解释和统计规范。该结构用于支撑从“综合折中有效”到“边界条件可解释”的证据组织，最终结论力度以回填数据的证据等级为准。

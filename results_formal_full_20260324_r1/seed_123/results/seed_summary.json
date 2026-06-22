@@ -1,0 +1,20 @@
+{
+  "seed": 123,
+  "policy_source": "trained",
+  "stages": [
+    "robustness"
+  ],
+  "result_dir": "results_formal_full_20260324_r1/seed_123/results",
+  "status": "resumed",
+  "timing_seconds": {
+    "train": 0.0,
+    "eval": 0.0,
+    "robustness": 1739.816889613052,
+    "robustness_risk": 701.6978712190175,
+    "robustness_pool": 423.0963355200365,
+    "robustness_fee": 615.0226828739978,
+    "total": 1740.646810238948
+  },
+  "requested_device": "cuda:0",
+  "resolved_device": "cuda:0"
+}

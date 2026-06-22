@@ -1,0 +1,11 @@
+{
+  "seed": 123,
+  "dimension": "risk_ratio",
+  "files": {
+    "0.05": "shared_pools_robust_risk_seed123_rr_0p05.json",
+    "0.1": "shared_pools_robust_risk_seed123_rr_0p1.json",
+    "0.15": "shared_pools_robust_risk_seed123_rr_0p15.json",
+    "0.2": "shared_pools_robust_risk_seed123_rr_0p2.json",
+    "0.3": "shared_pools_robust_risk_seed123_rr_0p3.json"
+  }
+}

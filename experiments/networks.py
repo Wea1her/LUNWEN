@@ -29,7 +29,7 @@ class ActorCritic(nn.Module):
     """
 
     def __init__(self, tx_dim: int = C.TX_FEATURE_DIM,
-                 block_dim: int = 3 + C.HIDDEN_DIM,
+                 block_dim: int = C.BLOCK_STATE_DIM,
                  hidden_dim: int = C.HIDDEN_DIM):
         super().__init__()
         self.encoder = FeatureEncoder(tx_dim, hidden_dim)
