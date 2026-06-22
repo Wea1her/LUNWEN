@@ -1,8 +1,0 @@
-{
-  "guard_version": "v20260324",
-  "can_claim_all_dimensions_best": false,
-  "blocking_reasons": [
-    "missing_aggregated_main"
-  ],
-  "metric_winner_by_dimension": {}
-}
