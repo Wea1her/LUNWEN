@@ -1,6 +1,7 @@
 """评估脚本: 对比 RL 方法与基线, 生成指标表格与图表"""
 
 import argparse
+import hashlib
 from copy import deepcopy
 import dataclasses
 import os
@@ -26,21 +27,40 @@ def build_shared_pools(n_episodes: int, pool_size: int,
     return [generate_pool(rng, pool_size, risk_ratio) for _ in range(n_episodes)]
 
 
+def _pool_payload_hash(pools_payload: list[list[dict]]) -> str:
+    raw = json.dumps(pools_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def save_shared_pools(path: str, shared_pools: list[list[Transaction]],
                       metadata: dict | None = None):
-    """将共享评估池落盘, 便于不同实验变体复用和复核。"""
+    """将共享池落盘并写入 hash，便于 V5 训练/验证/测试分离复核。"""
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
+    pools_payload = [
+        [dataclasses.asdict(tx) for tx in pool]
+        for pool in shared_pools
+    ]
+    pool_hash = _pool_payload_hash(pools_payload)
+    metadata_payload = dict(metadata or {})
+    metadata_payload.setdefault("protocol_version", getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"))
+    metadata_payload["pool_hash"] = pool_hash
+    metadata_payload["n_episodes"] = len(shared_pools)
     payload = {
-        "metadata": metadata or {},
-        "pools": [
-            [dataclasses.asdict(tx) for tx in pool]
-            for pool in shared_pools
-        ],
+        "metadata": metadata_payload,
+        "pools": pools_payload,
     }
     with open(path, "w") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
+    return pool_hash
+
+
+def load_shared_pool_metadata(path: str) -> dict:
+    """读取共享池 metadata，不加载方可复核 hash/role。"""
+    with open(path) as f:
+        payload = json.load(f)
+    return payload.get("metadata", {}) if isinstance(payload, dict) else {}
 
 
 def load_shared_pools(path: str) -> list[list[Transaction]]:

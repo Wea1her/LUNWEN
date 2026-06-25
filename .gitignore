@@ -37,3 +37,5 @@ chapters/journal/*.synctex.gz
 chapters/journal/*.synctex(busy)
 chapters/journal/*.toc
 chapters/journal/missfont.log
+# Ignore dry-run experiment outputs
+*dryrun*/

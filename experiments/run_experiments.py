@@ -21,6 +21,7 @@ from env import TxOrderingEnv
 from networks import ActorCritic
 from train import train as train_model
 from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
+                      load_shared_pool_metadata,
                       evaluate_rl, evaluate_baseline, aggregate,
                       build_fairness_decomposition, build_constrained_eval_summary,
                       build_operating_points_summary, build_constraint_bottleneck_report,
@@ -63,6 +64,39 @@ def _to_jsonable(value):
 def _write_json(path: str, payload: dict | list):
     with open(path, "w") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
+
+
+def _shared_pool_path(output_dir: str, role: str, filename: str) -> str:
+    path = os.path.join(output_dir, "pools", role, filename)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
+
+
+def _get_or_create_shared_pools(
+    path: str,
+    n_episodes: int,
+    pool_size: int,
+    risk_ratio: float,
+    generation_seed: int,
+    metadata: dict,
+) -> tuple[list[list], dict]:
+    """加载已冻结共享池，或首次生成并落盘。"""
+    if os.path.exists(path):
+        pools = load_shared_pools(path)
+        meta = load_shared_pool_metadata(path)
+        if len(pools) != n_episodes:
+            raise ValueError(
+                f"frozen pool episode mismatch for {path}: "
+                f"expected {n_episodes}, got {len(pools)}"
+            )
+        return pools, meta
+    pools = build_shared_pools(n_episodes, pool_size, risk_ratio, generation_seed)
+    meta = dict(metadata)
+    meta["generation_seed"] = generation_seed
+    pool_hash = save_shared_pools(path, pools, metadata=meta)
+    meta["pool_hash"] = pool_hash
+    meta["n_episodes"] = n_episodes
+    return pools, meta
 
 
 def _episode_rows(raw: dict[str, list[dict]], setting: str, setting_value, seed: int) -> list[dict]:
@@ -189,16 +223,29 @@ def _build_case_study_for_seed(
 
 def _run_main_evaluation(model, device, args, seed, result_dir):
     env = TxOrderingEnv(pool_size=args.pool_size, risk_ratio=C.RISK_RATIO, seed=seed)
-    shared_pools = build_shared_pools(args.eval_episodes, args.pool_size, C.RISK_RATIO, seed)
-    shared_pool_path = os.path.join(result_dir, f"shared_pools_main_seed{seed}.json")
-    save_shared_pools(shared_pool_path, shared_pools, metadata={
-        "seed": seed,
-        "eval_episodes": args.eval_episodes,
-        "pool_size": args.pool_size,
-        "risk_ratio": C.RISK_RATIO,
-        "setting": "main",
-        "baseline_methods": args.baseline_methods,
-    })
+    test_seed = seed + getattr(C, "TEST_POOL_SEED_OFFSET", 20000)
+    shared_pool_path = _shared_pool_path(
+        args.output,
+        "test",
+        f"test_pool_seed_{seed}_main.json",
+    )
+    shared_pools, test_pool_meta = _get_or_create_shared_pools(
+        shared_pool_path,
+        args.eval_episodes,
+        args.pool_size,
+        C.RISK_RATIO,
+        test_seed,
+        metadata={
+            "pool_role": "test",
+            "seed": seed,
+            "eval_episodes": args.eval_episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": C.RISK_RATIO,
+            "setting": "main",
+            "baseline_methods": args.baseline_methods,
+            "frozen": True,
+        },
+    )
 
     raw = {"ours": evaluate_rl(model, env, args.eval_episodes, device, shared_pools)}
     for bl in args.baseline_methods:
@@ -206,7 +253,14 @@ def _run_main_evaluation(model, device, args, seed, result_dir):
     agg = {method: aggregate(metrics) for method, metrics in raw.items()}
 
     _write_json(os.path.join(result_dir, "main_results.json"), agg)
-    _write_json(os.path.join(result_dir, "main_aggregated_metrics.json"), agg)
+    _write_json(os.path.join(result_dir, "main_aggregated_metrics.json"), {
+        "protocol_version": getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"),
+        "test_pool": {
+            "path": shared_pool_path,
+            "metadata": test_pool_meta,
+        },
+        "metrics": agg,
+    })
     _write_json(
         os.path.join(result_dir, "fairness_decomposition.json"),
         build_fairness_decomposition(raw),
@@ -222,8 +276,13 @@ def _run_main_evaluation(model, device, args, seed, result_dir):
         build_constraint_bottleneck_report(constrained_seed),
     )
     _write_json(os.path.join(result_dir, "main_episode_metrics.json"), {
+        "protocol_version": getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"),
         "seed": seed,
         "setting": "main",
+        "test_pool": {
+            "path": shared_pool_path,
+            "metadata": test_pool_meta,
+        },
         "records": _episode_rows(raw, "main", {"pool_size": args.pool_size, "risk_ratio": C.RISK_RATIO}, seed),
     })
     case_study_seed_path = _build_case_study_for_seed(
@@ -249,18 +308,27 @@ def _run_risk_robustness(model, device, args, seed, result_dir):
 
     for rr in C.ROBUSTNESS_RISK_RATIOS:
         env = TxOrderingEnv(pool_size=args.pool_size, risk_ratio=rr, seed=seed)
-        shared_pools = build_shared_pools(args.eval_episodes, args.pool_size, rr, seed)
         rr_tag = str(rr).replace(".", "p")
-        rr_pool_file = os.path.join(result_dir, f"shared_pools_robust_risk_seed{seed}_rr_{rr_tag}.json")
-        save_shared_pools(rr_pool_file, shared_pools, metadata={
-            "seed": seed,
-            "eval_episodes": args.eval_episodes,
-            "pool_size": args.pool_size,
-            "risk_ratio": rr,
-            "setting": "robustness_risk",
-            "baseline_methods": args.baseline_methods,
-        })
-        pool_index["files"][str(rr)] = os.path.basename(rr_pool_file)
+        rr_pool_file = _shared_pool_path(args.output, "test", f"test_pool_seed_{seed}_robust_risk_{rr_tag}.json")
+        shared_pools, rr_pool_meta = _get_or_create_shared_pools(
+            rr_pool_file,
+            args.eval_episodes,
+            args.pool_size,
+            rr,
+            seed + getattr(C, "TEST_POOL_SEED_OFFSET", 20000) + 1000 + int(round(rr * 1000)),
+            metadata={
+                "pool_role": "test",
+                "seed": seed,
+                "eval_episodes": args.eval_episodes,
+                "pool_size": args.pool_size,
+                "risk_ratio": rr,
+                "setting": "robustness_risk",
+                "frozen_model_from_default_scene": True,
+                "baseline_methods": args.baseline_methods,
+            },
+        )
+        pool_index["files"][str(rr)] = rr_pool_file
+        pool_index.setdefault("metadata", {})[str(rr)] = rr_pool_meta
 
         raw = {"ours": evaluate_rl(model, env, args.eval_episodes, device, shared_pools)}
         for bl in args.baseline_methods:
@@ -289,17 +357,26 @@ def _run_pool_robustness(model, device, args, seed, result_dir):
 
     for ps in C.ROBUSTNESS_POOL_SIZES:
         env = TxOrderingEnv(pool_size=ps, risk_ratio=C.RISK_RATIO, seed=seed)
-        shared_pools = build_shared_pools(args.eval_episodes, ps, C.RISK_RATIO, seed)
-        pool_file = os.path.join(result_dir, f"shared_pools_robust_pool_seed{seed}_N{ps}.json")
-        save_shared_pools(pool_file, shared_pools, metadata={
-            "seed": seed,
-            "eval_episodes": args.eval_episodes,
-            "pool_size": ps,
-            "risk_ratio": C.RISK_RATIO,
-            "setting": "robustness_pool_size",
-            "baseline_methods": args.baseline_methods,
-        })
-        pool_index["files"][str(ps)] = os.path.basename(pool_file)
+        pool_file = _shared_pool_path(args.output, "test", f"test_pool_seed_{seed}_robust_pool_N{ps}.json")
+        shared_pools, pool_meta = _get_or_create_shared_pools(
+            pool_file,
+            args.eval_episodes,
+            ps,
+            C.RISK_RATIO,
+            seed + getattr(C, "TEST_POOL_SEED_OFFSET", 20000) + 2000 + int(ps),
+            metadata={
+                "pool_role": "test",
+                "seed": seed,
+                "eval_episodes": args.eval_episodes,
+                "pool_size": ps,
+                "risk_ratio": C.RISK_RATIO,
+                "setting": "robustness_pool_size",
+                "frozen_model_from_default_scene": True,
+                "baseline_methods": args.baseline_methods,
+            },
+        )
+        pool_index["files"][str(ps)] = pool_file
+        pool_index.setdefault("metadata", {})[str(ps)] = pool_meta
 
         raw = {"ours": evaluate_rl(model, env, args.eval_episodes, device, shared_pools)}
         for bl in args.baseline_methods:
@@ -320,20 +397,29 @@ def _run_pool_robustness(model, device, args, seed, result_dir):
 def _run_fee_robustness(model, device, args, seed, result_dir):
     all_data = {}
     all_rows = []
-    base_shared_pools = build_shared_pools(args.eval_episodes, args.pool_size, C.RISK_RATIO, seed)
-    base_pool_file = os.path.join(result_dir, f"shared_pools_robust_fee_seed{seed}_base.json")
-    save_shared_pools(base_pool_file, base_shared_pools, metadata={
-        "seed": seed,
-        "eval_episodes": args.eval_episodes,
-        "pool_size": args.pool_size,
-        "risk_ratio": C.RISK_RATIO,
-        "setting": "robustness_fee_multiplier_base",
-        "baseline_methods": args.baseline_methods,
-    })
+    base_pool_file = _shared_pool_path(args.output, "test", f"test_pool_seed_{seed}_robust_fee_base.json")
+    base_shared_pools, base_pool_meta = _get_or_create_shared_pools(
+        base_pool_file,
+        args.eval_episodes,
+        args.pool_size,
+        C.RISK_RATIO,
+        seed + getattr(C, "TEST_POOL_SEED_OFFSET", 20000) + 3000,
+        metadata={
+            "pool_role": "test",
+            "seed": seed,
+            "eval_episodes": args.eval_episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": C.RISK_RATIO,
+            "setting": "robustness_fee_multiplier_base",
+            "frozen_model_from_default_scene": True,
+            "baseline_methods": args.baseline_methods,
+        },
+    )
     _write_json(os.path.join(result_dir, f"shared_pools_robust_fee_seed{seed}.json"), {
         "seed": seed,
         "dimension": "fee_multiplier",
-        "base_shared_pool_file": os.path.basename(base_pool_file),
+        "base_shared_pool_file": base_pool_file,
+        "base_shared_pool_metadata": base_pool_meta,
         "multipliers": C.ROBUSTNESS_FEE_MULTIPLIERS,
         "transform_rule": (
             "if tx.risk_score >= HEURISTIC_RISK_THRESHOLD: "
@@ -532,15 +618,23 @@ def aggregate_metric_grid(all_results):
         "block_fee",
         "fairness",
         "risk_exposure",
+        "edge_risk_ratio",
+        "edge10_risk",
+        "risky_inclusion_rate",
         "gas_util",
         "risky_rank",
         "packing_ratio",
         "top10_risk",
         "late_promo",
         "oldest_coverage",
+        "old_tx_pack_rate",
         "starvation_gap",
+        "starvation_ratio",
         "tail_wait_reduction",
         "selected_wait_std",
+        "wait_p95",
+        "wait_p99",
+        "wait_gini",
         "composite_score",
         "constrained_fee_score",
         "risk_adjusted_fee_score",
@@ -578,15 +672,23 @@ def aggregate_across_seeds(all_main=None, all_rob_risk=None, all_rob_pool=None, 
         "block_fee",
         "fairness",
         "risk_exposure",
+        "edge_risk_ratio",
+        "edge10_risk",
+        "risky_inclusion_rate",
         "gas_util",
         "risky_rank",
         "packing_ratio",
         "top10_risk",
         "late_promo",
         "oldest_coverage",
+        "old_tx_pack_rate",
         "starvation_gap",
+        "starvation_ratio",
         "tail_wait_reduction",
         "selected_wait_std",
+        "wait_p95",
+        "wait_p99",
+        "wait_gini",
         "composite_score",
         "constrained_fee_score",
         "risk_adjusted_fee_score",
@@ -1149,17 +1251,106 @@ def _method_metric_summary(main_episode_rows: list[dict], method_id: str, metric
     return {"mean": float(np.mean(vals)), "std": float(np.std(vals)), "count": len(vals)}
 
 
+def _build_seed_level_statistics(main_episode_rows: list[dict], baseline_methods: list[str], evidence_level: str) -> dict:
+    """V5 统计摘要：先按独立训练 seed 聚合，再比较方法差值。"""
+    metrics = [
+        "block_fee",
+        "fairness",
+        "risk_exposure",
+        "edge10_risk",
+        "risky_inclusion_rate",
+        "gas_util",
+        "packing_ratio",
+        "old_tx_pack_rate",
+        "starvation_ratio",
+        "composite_score",
+        "risk_adjusted_fee_score",
+    ]
+    methods = ["ours", *baseline_methods]
+    by_seed: dict[int, dict[str, dict[str, float]]] = {}
+    for row in main_episode_rows:
+        if row.get("setting", "main") != "main":
+            continue
+        seed = row.get("seed")
+        method = row.get("method")
+        if seed is None or method not in methods:
+            continue
+        by_seed.setdefault(int(seed), {}).setdefault(method, {m: [] for m in metrics})
+        row_metrics = row.get("metrics", {})
+        for metric in metrics:
+            value = row_metrics.get(metric)
+            if value is not None:
+                by_seed[int(seed)][method][metric].append(float(value))
+
+    seed_means: dict[str, dict[str, dict[str, float]]] = {}
+    for seed, method_payload in sorted(by_seed.items()):
+        seed_means[str(seed)] = {}
+        for method, metric_payload in method_payload.items():
+            seed_means[str(seed)][method] = {
+                metric: float(np.mean(values)) if values else float("nan")
+                for metric, values in metric_payload.items()
+            }
+
+    lower_is_better = {"risk_exposure", "edge10_risk", "starvation_ratio"}
+    paired = {}
+    for baseline in baseline_methods:
+        paired[baseline] = {}
+        for metric in metrics:
+            diffs = []
+            better_flags = []
+            for seed_payload in seed_means.values():
+                if "ours" not in seed_payload or baseline not in seed_payload:
+                    continue
+                ours = seed_payload["ours"].get(metric)
+                base = seed_payload[baseline].get(metric)
+                if ours is None or base is None or np.isnan(ours) or np.isnan(base):
+                    continue
+                diff = float(ours) - float(base)
+                diffs.append(diff)
+                if metric in lower_is_better:
+                    better_flags.append(1.0 if diff < 0.0 else 0.0)
+                else:
+                    better_flags.append(1.0 if diff > 0.0 else 0.0)
+            paired[baseline][metric] = {
+                "n_seed_pairs": len(diffs),
+                "mean_delta": float(np.mean(diffs)) if diffs else float("nan"),
+                "std_delta": float(np.std(diffs)) if diffs else float("nan"),
+                "ours_better_seed_rate": float(np.mean(better_flags)) if better_flags else float("nan"),
+                "higher_is_better": metric not in lower_is_better,
+            }
+
+    n_seeds = len(seed_means)
+    formal_min = int(getattr(C, "EVIDENCE_FORMAL_MIN_SEEDS", 5))
+    return {
+        "protocol_version": getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"),
+        "statistical_unit": "independent_training_seed",
+        "episode_role": "within-seed evaluation samples, not independent training repeats",
+        "evidence_level": evidence_level,
+        "formal_statistics_ready": evidence_level == "formal_multi_seed" and n_seeds >= formal_min,
+        "formal_min_seeds": formal_min,
+        "n_completed_seeds": n_seeds,
+        "metrics": metrics,
+        "seed_means": seed_means,
+        "paired_deltas_ours_vs_baselines_by_seed": paired,
+    }
+
+
 def _build_behavior_probe(main_episode_rows: list[dict], baseline_methods: list[str]) -> dict:
     metrics = [
         "block_fee",
         "fairness",
         "risk_exposure",
+        "edge10_risk",
+        "risky_inclusion_rate",
         "gas_util",
         "risky_rank",
         "top10_risk",
+        "risky_inclusion_rate",
         "late_promo",
         "oldest_coverage",
+        "old_tx_pack_rate",
         "starvation_gap",
+        "starvation_ratio",
         "tail_wait_reduction",
         "composite_score",
     ]
@@ -1228,6 +1419,7 @@ def _build_fairness_decomposition_from_rows(main_episode_rows: list[dict], basel
         "fairness",
         "oldest_coverage",
         "starvation_gap",
+        "starvation_ratio",
         "tail_wait_reduction",
         "selected_wait_std",
         "wait_p95",
@@ -1430,8 +1622,12 @@ def main():
                         help="跳过已有完整输出的 seed")
     parser.add_argument("--allow-random-fallback", action="store_true",
                         help="当 checkpoint 缺失时允许随机策略回退")
-    parser.add_argument("--enable-center-aware-baseline", action="store_true",
-                        help="启用更强启发式基线 Center-Aware Greedy")
+    parser.add_argument("--enable-center-aware-baseline", dest="enable_center_aware_baseline",
+                        action="store_true", default=getattr(C, "ENABLE_STRONG_BASELINE_DEFAULT", True),
+                        help="启用 V5 强启发式基线 Dynamic Tri-Objective Greedy（默认启用）")
+    parser.add_argument("--disable-strong-baseline", dest="enable_center_aware_baseline",
+                        action="store_false",
+                        help="关闭 V5 强启发式基线，仅保留五类基础基线")
     parser.add_argument("--track", type=str, default="composite_optimal_track",
                         choices=["fairness_recovery_track", "composite_optimal_track"],
                         help="正式协议轨道：fairness_recovery_track 或 composite_optimal_track")
@@ -1528,6 +1724,8 @@ def main():
     }
     run_summary = {
         "timestamp": datetime.now().isoformat(),
+        "protocol_version": getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"),
+        "protocol_name": getattr(C, "EXPERIMENT_PROTOCOL_NAME", "unknown"),
         "stages": args.stages,
         "track": args.track,
         "allow_random_fallback": args.allow_random_fallback,
@@ -1757,6 +1955,15 @@ def main():
             _write_json(behavior_probe_path, behavior_probe)
             run_summary["outputs"]["behavior_probe"] = os.path.basename(behavior_probe_path)
 
+            seed_level_stats = _build_seed_level_statistics(
+                main_episode_rows,
+                args.baseline_methods,
+                run_summary["evidence_level"],
+            )
+            seed_level_stats_path = os.path.join(args.output, "seed_level_statistics.json")
+            _write_json(seed_level_stats_path, seed_level_stats)
+            run_summary["outputs"]["seed_level_statistics"] = os.path.basename(seed_level_stats_path)
+
             fairness_decomp = _build_fairness_decomposition_from_rows(
                 main_episode_rows,
                 args.baseline_methods,
@@ -1961,6 +2168,37 @@ def main():
     _write_json(narrative_guard_path, narrative_guard)
     run_summary["outputs"]["narrative_guard"] = os.path.basename(narrative_guard_path)
 
+    v5_protocol_manifest = {
+        "protocol_version": getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"),
+        "protocol_name": getattr(C, "EXPERIMENT_PROTOCOL_NAME", "unknown"),
+        "evidence_level": run_summary.get("evidence_level", "unknown"),
+        "formal_min_seeds": int(getattr(C, "EVIDENCE_FORMAL_MIN_SEEDS", 5)),
+        "formal_statistics_ready": run_summary.get("evidence_level") == "formal_multi_seed",
+        "data_separation": {
+            "train_seed_offset": getattr(C, "TRAIN_POOL_SEED_OFFSET", 0),
+            "validation_seed_offset": getattr(C, "VALIDATION_SEED_OFFSET", 10000),
+            "test_seed_offset": getattr(C, "TEST_POOL_SEED_OFFSET", 20000),
+            "test_pools_frozen_on_disk": os.path.isdir(os.path.join(args.output, "pools", "test")),
+        },
+        "baseline_protocol": {
+            "strong_baseline_enabled": bool(args.enable_center_aware_baseline),
+            "strong_baseline_name": "Dynamic Tri-Objective Greedy",
+            "baseline_methods": args.baseline_methods,
+        },
+        "statistics_protocol": {
+            "primary_unit": "independent_training_seed",
+            "episode_level_tests_are_diagnostic_only_when_nonformal": True,
+            "multiple_comparison_correction": "pending_for_formal_v5",
+        },
+        "scope_boundary": (
+            "risk_score is a proxy for position-sensitive ordering risk; "
+            "results do not claim real on-chain MEV-defense effectiveness"
+        ),
+    }
+    v5_protocol_manifest_path = os.path.join(args.output, "v5_protocol_manifest.json")
+    _write_json(v5_protocol_manifest_path, v5_protocol_manifest)
+    run_summary["outputs"]["v5_protocol_manifest"] = os.path.basename(v5_protocol_manifest_path)
+
     required_for_main_story = [
         "table_main_core",
         "table_main_fullmetrics",
@@ -1970,11 +2208,14 @@ def main():
         "constrained_eval_summary",
         "operating_points_summary",
         "constraint_bottleneck_report",
+        "seed_level_statistics",
+        "v5_protocol_manifest",
         "narrative_guard",
     ]
     missing = [k for k in required_for_main_story if k not in run_summary["outputs"]]
     outputs_manifest = {
-        "version": "v20260326_operating_points_package",
+        "version": "v5_experiment_package",
+        "protocol_version": getattr(C, "EXPERIMENT_PROTOCOL_VERSION", "unknown"),
         "required_keys": required_for_main_story,
         "missing_keys": missing,
         "report_incomplete": len(missing) > 0,

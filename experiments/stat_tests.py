@@ -135,13 +135,17 @@ def run_significance_tests(
             "block_fee",
             "fairness",
             "risk_exposure",
+            "edge10_risk",
+            "risky_inclusion_rate",
             "gas_util",
             "risky_rank",
             "packing_ratio",
             "top10_risk",
             "late_promo",
             "oldest_coverage",
+            "old_tx_pack_rate",
             "starvation_gap",
+            "starvation_ratio",
             "tail_wait_reduction",
             "composite_score",
             "constrained_fee_score",
@@ -201,13 +205,17 @@ def run_paired_significance_tests(
             "block_fee",
             "fairness",
             "risk_exposure",
+            "edge10_risk",
+            "risky_inclusion_rate",
             "gas_util",
             "risky_rank",
             "packing_ratio",
             "top10_risk",
             "late_promo",
             "oldest_coverage",
+            "old_tx_pack_rate",
             "starvation_gap",
+            "starvation_ratio",
             "tail_wait_reduction",
             "composite_score",
             "constrained_fee_score",
@@ -297,7 +305,9 @@ def run_paired_significance_tests(
     return results
 
 
-def _significance_mark(p_value: float) -> str:
+def _significance_mark(p_value: float, exploratory_only: bool = False) -> str:
+    if exploratory_only:
+        return "ns"
     if p_value < 0.001:
         return "***"
     if p_value < 0.01:
@@ -314,7 +324,7 @@ def format_significance_table(sig_results: dict) -> str:
     lines.append("-" * 88)
     for bl, metrics in sig_results.items():
         for met, r in metrics.items():
-            sig_mark = _significance_mark(r["p_value"])
+            sig_mark = _significance_mark(r["p_value"], r.get("exploratory_only", False))
             lines.append(
                 f"{display_name(bl):<22s} {met:<16s} {r['ours_mean']:>8.4f} "
                 f"{r['baseline_mean']:>8.4f} {r['cohens_d']:>6.2f} {r['p_value']:>8.4f} {sig_mark:>4s}"
@@ -345,7 +355,7 @@ def generate_significance_latex(sig_results: dict, output_path: str):
     lines = []
     for bl, metrics in sig_results.items():
         for met, r in metrics.items():
-            sig_mark = _significance_mark(r["p_value"])
+            sig_mark = _significance_mark(r["p_value"], r.get("exploratory_only", False))
             sig_mark = "" if sig_mark == "ns" else f"^{{{sig_mark}}}"
             lines.append(
                 f"{latex_escape(display_name(bl))} & {latex_escape(met)} & "
@@ -362,8 +372,8 @@ def generate_paired_significance_latex(sig_results: dict, output_path: str):
     lines = []
     for bl, metrics in sig_results.items():
         for met, r in metrics.items():
-            sig_t = _significance_mark(r["paired_t"]["p_value"])
-            sig_w = _significance_mark(r["wilcoxon"]["p_value"])
+            sig_t = _significance_mark(r["paired_t"]["p_value"], r.get("exploratory_only", False))
+            sig_w = _significance_mark(r["wilcoxon"]["p_value"], r.get("exploratory_only", False))
             sig_t = "" if sig_t == "ns" else f"^{{{sig_t}}}"
             sig_w = "" if sig_w == "ns" else f"^{{{sig_w}}}"
             lines.append(

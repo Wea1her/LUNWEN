@@ -282,10 +282,11 @@ def train(args, env_kwargs: dict | None = None):
     args.curriculum_stage_episodes = curriculum_cuts
     args.fairness_first = fairness_first
     active_env_kwargs = _curriculum_env_kwargs(base_env_kwargs, args, current_stage)
+    train_pool_seed = args.seed + getattr(C, "TRAIN_POOL_SEED_OFFSET", 0)
     env = TxOrderingEnv(
         pool_size=args.pool_size,
         risk_ratio=args.risk_ratio,
-        seed=args.seed,
+        seed=train_pool_seed,
         **active_env_kwargs,
     )
 
@@ -329,10 +330,48 @@ def train(args, env_kwargs: dict | None = None):
         "stage_switches": [],
     }
 
+    save_train_pools_limit = int(getattr(C, "V5_SAVE_FULL_TRAIN_POOLS_MAX_EPISODES", 0))
+    materialize_train_pools = args.episodes <= save_train_pools_limit
+    training_pools = None
+    train_pool_path = os.path.join(args.output, "train_pools.json")
+    train_manifest_path = os.path.join(args.output, "train_pool_manifest.json")
+    if materialize_train_pools:
+        training_pools = build_shared_pools(args.episodes, args.pool_size, args.risk_ratio, train_pool_seed)
+        train_pool_hash = save_shared_pools(train_pool_path, training_pools, metadata={
+            "pool_role": "train",
+            "seed": args.seed,
+            "generation_seed": train_pool_seed,
+            "episodes": args.episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": args.risk_ratio,
+            "materialized": True,
+        })
+        train_pool_record = {
+            "pool_role": "train",
+            "materialized": True,
+            "file": os.path.basename(train_pool_path),
+            "pool_hash": train_pool_hash,
+            "generation_seed": train_pool_seed,
+            "episodes": args.episodes,
+        }
+    else:
+        train_pool_record = {
+            "pool_role": "train",
+            "materialized": False,
+            "file": None,
+            "pool_hash": None,
+            "generation_seed": train_pool_seed,
+            "episodes": args.episodes,
+            "reconstruction": "TxOrderingEnv seeded with generation_seed; pools generated deterministically per reset",
+        }
+        with open(train_manifest_path, "w") as f:
+            json.dump(train_pool_record, f, indent=2, ensure_ascii=False)
+
     validation_seed = args.seed + C.VALIDATION_SEED_OFFSET
     validation_pools = build_shared_pools(args.val_episodes, args.pool_size, args.risk_ratio, validation_seed)
     validation_pool_path = os.path.join(args.output, "validation_pools.json")
-    save_shared_pools(validation_pool_path, validation_pools, metadata={
+    validation_pool_hash = save_shared_pools(validation_pool_path, validation_pools, metadata={
+        "pool_role": "validation",
         "seed": args.seed,
         "validation_seed": validation_seed,
         "validation_episodes": args.val_episodes,
@@ -371,12 +410,15 @@ def train(args, env_kwargs: dict | None = None):
             env = TxOrderingEnv(
                 pool_size=args.pool_size,
                 risk_ratio=args.risk_ratio,
-                seed=args.seed,
+                seed=train_pool_seed,
                 **active_env_kwargs,
             )
             log["stage_switches"].append({"episode": ep, "stage": current_stage})
 
-        obs, _ = env.reset()
+        if training_pools is not None:
+            obs, _ = env.reset_with_pool(training_pools[ep - 1])
+        else:
+            obs, _ = env.reset()
         ep_reward = 0.0
 
         while True:
@@ -471,6 +513,16 @@ def train(args, env_kwargs: dict | None = None):
             "formal_eval_rule": C.FORMAL_EVAL_CHECKPOINT_RULE,
             "best_checkpoint": C.BEST_CHECKPOINT_NAME,
             "final_checkpoint": C.FINAL_CHECKPOINT_NAME,
+            "data_pools": {
+                "train": train_pool_record,
+                "validation": {
+                    "pool_role": "validation",
+                    "file": os.path.basename(validation_pool_path),
+                    "pool_hash": validation_pool_hash,
+                    "generation_seed": validation_seed,
+                    "episodes": args.val_episodes,
+                },
+            },
             "selection_rule": {
                 "type": "fixed_validation_pool",
                 "validation_metric": args.val_metric,
@@ -479,6 +531,7 @@ def train(args, env_kwargs: dict | None = None):
                 "validation_interval": args.val_interval,
                 "validation_seed": validation_seed,
                 "validation_pool_file": os.path.basename(validation_pool_path),
+                "validation_pool_hash": validation_pool_hash,
                 "validation_fairness_floor": args.val_fairness_floor,
                 "validation_oldest_coverage_floor": args.val_oldest_coverage_floor,
                 "validation_risk_ceil": args.val_risk_ceil,

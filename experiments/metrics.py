@@ -152,6 +152,18 @@ def top10_risk_ratio(selected: List[Transaction],
     return risky_count / n_top
 
 
+def risky_inclusion_rate(selected: List[Transaction],
+                         pool: List[Transaction],
+                         threshold: float = C.HEURISTIC_RISK_THRESHOLD) -> float:
+    """候选池中高风险交易被打包的比例，用于排除选择性不打包造成的伪风险下降。"""
+    risky_pool = [tx for tx in pool if tx.risk_score >= threshold]
+    if not risky_pool:
+        return 0.0
+    selected_ids = {tx.tid for tx in selected}
+    included = sum(1 for tx in risky_pool if tx.tid in selected_ids)
+    return included / len(risky_pool)
+
+
 def late_arrival_promotion_rate(selected: List[Transaction],
                                 pool: List[Transaction]) -> float:
     """后到达高手续费交易被提前打包的比例"""
@@ -559,14 +571,18 @@ def compute_all_metrics(selected: List[Transaction],
         "fairness": jain_fairness_index(selected, t_now),
         "risk_exposure": risk_exposure(selected),
         "edge_risk_ratio": edge_risk_ratio(selected),
+        "edge10_risk": edge_risk_ratio(selected),
         "gas_util": gas_utilization(selected, pool_size=len(pool)),
         "risky_rank": avg_risky_rank(selected),
         "packing_ratio": packing_ratio(selected, pool),
         "top10_risk": top10_risk_ratio(selected),
         "late_promo": late_arrival_promotion_rate(selected, pool),
         "oldest_coverage": oldest_cov,
+        "old_tx_pack_rate": oldest_cov,
         "starvation_gap": 1.0 - oldest_cov,
+        "starvation_ratio": 1.0 - oldest_cov,
         "tail_wait_reduction": tail_wait_reduction(selected, pool, q=C.FAIR_TAIL_QUANTILE),
+        "risky_inclusion_rate": risky_inclusion_rate(selected, pool),
     }
     if selected:
         waits = np.array([max(t_now - tx.arrival_time, 0.0) for tx in selected], dtype=np.float64)

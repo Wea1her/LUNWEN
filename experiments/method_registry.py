@@ -52,8 +52,8 @@ METHOD_SPECS: dict[str, MethodSpec] = {
     ),
     "center_aware": MethodSpec(
         method_id="center_aware",
-        display_name="Center-Aware Greedy",
-        latex_name="Center-Aware Greedy",
+        display_name="Dynamic Tri-Objective Greedy",
+        latex_name="Dynamic Tri-Objective Greedy",
         is_baseline=True,
     ),
 }
@@ -72,7 +72,7 @@ LEGACY_METHOD_ALIASES: dict[str, str] = {
 DEFAULT_BASELINE_METHOD_IDS = ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]
 STRONG_BASELINE_METHOD_IDS = ["center_aware"]
 MAIN_METHOD_ORDER = [*DEFAULT_BASELINE_METHOD_IDS, *STRONG_BASELINE_METHOD_IDS, "ours"]
-BASELINE_METHOD_IDS = list(DEFAULT_BASELINE_METHOD_IDS)
+BASELINE_METHOD_IDS = [*DEFAULT_BASELINE_METHOD_IDS, *STRONG_BASELINE_METHOD_IDS]
 
 
 def get_baseline_method_ids(include_strong_baseline: bool = False) -> list[str]:
