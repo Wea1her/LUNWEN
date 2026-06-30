@@ -1,4 +1,4 @@
-"""统计检验: seed 级 Welch t-test + episode 级配对检验"""
+"""统计检验: seed 级配对检验 + bootstrap CI + Holm 校正，episode 级诊断检验。"""
 
 from __future__ import annotations
 
@@ -129,7 +129,7 @@ def mann_whitney_u(vals_a: list[float], vals_b: list[float]) -> dict:
 def run_significance_tests(
     all_main: list[dict], ours_key: str = "ours", metrics: Optional[list[str]] = None
 ) -> dict:
-    """seed 级统计检验: 本文方法 vs 每个基线 (Welch t-test)。"""
+    """兼容旧输出的 seed 汇总 Welch 检验；V5 正式结论使用 run_seed_level_paired_tests。"""
     if metrics is None:
         metrics = [
             "block_fee",

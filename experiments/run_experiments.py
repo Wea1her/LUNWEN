@@ -1738,7 +1738,7 @@ def main():
                         help="启用 V5 强启发式基线 Center-Insertion 和 Dynamic Tri-Objective Greedy（默认启用）")
     parser.add_argument("--disable-strong-baseline", dest="enable_strong_baseline",
                         action="store_false",
-                        help="关闭 V5 强启发式基线，仅保留五类基础基线")
+                        help="关闭 V5 强启发式基线，仅保留基础规则基线")
     parser.add_argument("--skip-baseline-tuning", action="store_true",
                         help="跳过含参数基线的验证池网格调参，使用 config.py 默认参数")
     parser.add_argument("--track", type=str, default="composite_optimal_track",
