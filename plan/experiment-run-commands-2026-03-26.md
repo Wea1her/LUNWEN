@@ -1,8 +1,8 @@
-# 实验预验与正式运行命令（2026-03-26）
+# 实验预验与正式运行命令（V5 同步版，2026-06-30 回填）
 
 ## 目标
 
-给出当前第四版实验框架在“先小规模预验、再正式运行”思路下的推荐命令，尽量减少无效长跑与中途返工。
+给出当前 V5 实验框架在“先小规模 GPU 预验、再正式运行”思路下的推荐命令，尽量减少无效长跑与中途返工。
 
 ---
 
@@ -13,8 +13,10 @@
 - 当前工作目录为仓库根目录；
 - 使用 `python` 直接运行 `experiments/run_experiments.py`；
 - 当前脚本默认 `workers=1`，即串行运行；若要恢复并行，需显式传 `--workers`；
-- 正式主实验推荐显式传：`--operating-mode balanced --val-metric two_stage --fairness-first`；
+- 正式主实验推荐显式传：`--operating-mode balanced --val-metric two_stage --fairness-first --device cuda:0`；
 - 约束 profile 推荐：评估 `strict`，训练 `relaxed_for_training`（脚本默认已按该组合）；
+- V5 强基线默认启用，包含 `Center-Insertion Heuristic` 和 `Dynamic Tri-Objective Greedy`；如需关闭，使用 `--disable-strong-baseline`；
+- 含参数基线默认在验证池调参；如需跳过，使用 `--skip-baseline-tuning`。
 - 若环境尚未安装依赖，先执行：
 
 ```bash
@@ -214,9 +216,14 @@ python experiments/run_experiments.py \
 
 ## 五、可选命令
 
-### 5.1 启用更强启发式基线
+### 5.1 强基线与基线调参开关
 
-当需要提高对照强度时，可加入 `Center-Aware Greedy`：
+V5 强基线默认启用，无需再使用旧的 `--enable-center-aware-baseline`。默认主实验会包含：
+
+- Center-Insertion Heuristic；
+- Dynamic Tri-Objective Greedy。
+
+如需显式确认强基线开启，可写：
 
 ```bash
 python experiments/run_experiments.py \
@@ -225,10 +232,29 @@ python experiments/run_experiments.py \
   --episodes 3000 \
   --eval-episodes 1000 \
   --pool-size 300 \
-  --enable-center-aware-baseline \
+  --val-metric two_stage \
+  --fairness-first \
+  --enable-strong-baseline \
   --output results_formal_main_robust_strong \
   --resume
 ```
+
+如需做基础五类基线的回退对照，可使用：
+
+```bash
+python experiments/run_experiments.py \
+  --stages main \
+  --seeds 42 123 456 789 2025 \
+  --episodes 3000 \
+  --eval-episodes 1000 \
+  --pool-size 300 \
+  --disable-strong-baseline \
+  --output results_formal_basic_baselines \
+  --resume
+```
+
+默认会在验证池上为含参数基线调参，并输出 `baseline_tuning.json`、`baseline_best_params.json` 和 `table_baseline_params.tex`。
+
 
 ### 5.2 仅评估已有模型（跳过训练）
 
@@ -405,7 +431,16 @@ python experiments/run_experiments.py \
 - `timing.json`
 - `aggregated_main.json`
 - `table2_content.tex`
-- `paired_significance_tests.json`
+- `paired_significance_tests.json`（episode 级诊断）
+
+- `baseline_tuning.json`
+- `baseline_best_params.json`
+- `table_baseline_params.tex`
+- `method_registry.json`
+- `seed_level_statistics.json`
+- `seed_level_paired_tests.json`
+- `table_seed_level_significance.tex`
+- `v5_protocol_manifest.json`
 - `case_study.json`
 - `behavior_probe.json`
 - `constrained_eval_summary.json`
@@ -560,3 +595,7 @@ python experiments/run_experiments.py \
 
 - 该方案可支撑方向性结论，但鲁棒性/消融属于“快速验证强度”；
 - 若用于最终定稿，建议后续补齐到正式强度（至少提升鲁棒性和消融 seed 数）。
+
+## 十一、2026-06-30 同步回填
+
+本文件已同步当前 V5 CLI：强基线使用 `--enable-strong-baseline/--disable-strong-baseline`，旧 `--enable-center-aware-baseline` 不再作为推荐命令；正式统计以 seed 级输出为主，`paired_significance_tests.json` 仅作为 episode 级诊断。

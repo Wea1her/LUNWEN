@@ -305,6 +305,182 @@ def run_paired_significance_tests(
     return results
 
 
+def bootstrap_mean_ci(vals: list[float], confidence: float = 0.95, n_boot: int = 10000, seed: int = 20260326) -> tuple:
+    """均值差的 bootstrap 百分位置信区间。"""
+    arr = np.array(vals, dtype=np.float64)
+    if len(arr) == 0:
+        return (0.0, 0.0)
+    if len(arr) == 1:
+        return (float(arr[0]), float(arr[0]))
+    rng = np.random.default_rng(seed)
+    draws = rng.choice(arr, size=(n_boot, len(arr)), replace=True).mean(axis=1)
+    alpha = (1.0 - confidence) / 2.0
+    lo, hi = np.quantile(draws, [alpha, 1.0 - alpha])
+    return (float(lo), float(hi))
+
+
+def holm_adjust(p_values: list[float]) -> list[float]:
+    """Holm-Bonferroni adjusted p-values, returned in original order."""
+    m = len(p_values)
+    if m == 0:
+        return []
+    order = sorted(range(m), key=lambda i: p_values[i])
+    adjusted = [1.0] * m
+    running_max = 0.0
+    for rank, idx in enumerate(order):
+        raw = min((m - rank) * float(p_values[idx]), 1.0)
+        running_max = max(running_max, raw)
+        adjusted[idx] = running_max
+    return adjusted
+
+
+def run_seed_level_paired_tests(seed_level_statistics: dict, ours_key: str = "ours", metrics: Optional[list[str]] = None) -> dict:
+    """以独立训练 seed 为单位做正式配对统计。"""
+    ensure_scipy()
+    seed_means = seed_level_statistics.get("seed_means", {})
+    if metrics is None:
+        metrics = list(seed_level_statistics.get("metrics") or [
+            "block_fee",
+            "fairness",
+            "risk_exposure",
+            "edge10_risk",
+            "risky_inclusion_rate",
+            "gas_util",
+            "packing_ratio",
+            "old_tx_pack_rate",
+            "starvation_ratio",
+            "composite_score",
+            "risk_adjusted_fee_score",
+        ])
+    lower_is_better = {
+        "risk_exposure",
+        "edge10_risk",
+        "top10_risk",
+        "starvation_ratio",
+        "starvation_gap",
+        "selected_wait_std",
+        "wait_p95",
+        "wait_p99",
+        "wait_gini",
+        "invalid_action_count",
+        "invalid_action_rate",
+        "invalid_truncation_count",
+        "invalid_truncation_rate",
+        "max_invalid_streak",
+        "mean_consecutive_invalid_actions",
+        "mean_inference_time",
+        "p95_inference_time",
+        "max_inference_time",
+    }
+
+    methods_present = set()
+    for payload in seed_means.values():
+        methods_present.update(payload.keys())
+    baselines = [m for m in MAIN_METHOD_ORDER if m != ours_key and m in methods_present]
+    exploratory_only = not bool(seed_level_statistics.get("formal_statistics_ready", False))
+
+    flat_keys = []
+    flat_p = []
+    results: dict[str, dict] = {}
+    for bl in baselines:
+        results[bl] = {}
+        for metric in metrics:
+            ours_vals = []
+            bl_vals = []
+            seeds_used = []
+            for seed, payload in sorted(seed_means.items(), key=lambda kv: int(kv[0])):
+                if ours_key not in payload or bl not in payload:
+                    continue
+                ours = payload[ours_key].get(metric)
+                base = payload[bl].get(metric)
+                if ours is None or base is None or np.isnan(float(ours)) or np.isnan(float(base)):
+                    continue
+                ours_vals.append(float(ours))
+                bl_vals.append(float(base))
+                seeds_used.append(int(seed))
+
+            diff = (np.array(ours_vals) - np.array(bl_vals)).tolist()
+            tt = paired_ttest(ours_vals, bl_vals) if len(diff) >= 2 else {"t_stat": 0.0, "p_value": 1.0}
+            dz = paired_cohens_d(ours_vals, bl_vals)
+            ci = bootstrap_mean_ci(diff, seed=20260326 + len(flat_keys)) if diff else (0.0, 0.0)
+            higher_is_better = metric not in lower_is_better
+            if diff:
+                better = [(d > 0.0) if higher_is_better else (d < 0.0) for d in diff]
+            else:
+                better = []
+            item = {
+                "statistical_unit": "independent_training_seed",
+                "seeds": seeds_used,
+                "n_seed_pairs": len(diff),
+                "ours_mean": float(np.mean(ours_vals)) if ours_vals else 0.0,
+                "baseline_mean": float(np.mean(bl_vals)) if bl_vals else 0.0,
+                "mean_diff": float(np.mean(diff)) if diff else 0.0,
+                "paired_t": tt,
+                "cohens_dz": dz,
+                "bootstrap_ci_diff_95": ci,
+                "ours_better_seed_rate": float(np.mean(better)) if better else 0.0,
+                "higher_is_better": higher_is_better,
+                "exploratory_only": exploratory_only,
+            }
+            results[bl][metric] = item
+            flat_keys.append((bl, metric))
+            flat_p.append(float(tt["p_value"]))
+
+    adjusted = holm_adjust(flat_p)
+    for (bl, metric), p_holm in zip(flat_keys, adjusted):
+        item = results[bl][metric]
+        item["p_value_holm"] = float(p_holm)
+        item["significant_holm"] = (p_holm < 0.05) and (not item.get("exploratory_only", False))
+
+    return {
+        "protocol": "seed_level_paired_tests_with_bootstrap_ci_and_holm",
+        "statistical_unit": "independent_training_seed",
+        "episode_level_role": "diagnostic_only",
+        "multiple_comparison_correction": "Holm-Bonferroni across all baseline-metric tests",
+        "formal_statistics_ready": bool(seed_level_statistics.get("formal_statistics_ready", False)),
+        "exploratory_only": exploratory_only,
+        "metrics": metrics,
+        "results": results,
+    }
+
+
+def format_seed_level_significance_table(sig_payload: dict) -> str:
+    """格式化 seed 级正式统计报告。"""
+    results = sig_payload.get("results", {})
+    lines = []
+    lines.append(
+        f"{'Baseline':<28s} {'Metric':<28s} {'N':>3s} {'Diff':>10s} {'CI95':>23s} {'dz':>7s} {'pH':>8s}"
+    )
+    lines.append("-" * 112)
+    for bl, metrics in results.items():
+        for met, r in metrics.items():
+            lo, hi = r.get("bootstrap_ci_diff_95", [0.0, 0.0])
+            lines.append(
+                f"{display_name(bl):<28s} {met:<28s} {r['n_seed_pairs']:>3d} "
+                f"{r['mean_diff']:>10.4f} [{lo:>7.4f},{hi:>7.4f}] "
+                f"{r['cohens_dz']:>7.2f} {r.get('p_value_holm', 1.0):>8.4f}"
+            )
+    return "\n".join(lines)
+
+
+def generate_seed_level_significance_latex(sig_payload: dict, output_path: str):
+    """生成 seed 级正式显著性检验 LaTeX 表格。"""
+    lines = []
+    for bl, metrics in sig_payload.get("results", {}).items():
+        for met, r in metrics.items():
+            sig_mark = _significance_mark(r.get("p_value_holm", 1.0), r.get("exploratory_only", False))
+            sig_mark = "" if sig_mark == "ns" else f"^{{{sig_mark}}}"
+            lo, hi = r.get("bootstrap_ci_diff_95", [0.0, 0.0])
+            lines.append(
+                f"{latex_escape(display_name(bl))} & {latex_escape(met)} & "
+                f"${r['n_seed_pairs']}$ & ${r['mean_diff']:.4f}$ & "
+                f"$[{lo:.4f}, {hi:.4f}]$ & ${r['cohens_dz']:.2f}$ & "
+                f"${r.get('p_value_holm', 1.0):.4f}{sig_mark}$ \\\\"
+            )
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def _significance_mark(p_value: float, exploratory_only: bool = False) -> str:
     if exploratory_only:
         return "ns"
@@ -422,6 +598,7 @@ if __name__ == "__main__":
     if all_episode_rows:
         sig = run_paired_significance_tests(all_episode_rows)
         print(format_paired_significance_table(sig))
+        print("\nNote: episode-level paired tests are diagnostic; formal claims should use seed-level paired tests.")
         sig_path = os.path.join(results_dir, "paired_significance_tests.json")
         with open(sig_path, "w") as f:
             json.dump(sig, f, indent=2, ensure_ascii=False)

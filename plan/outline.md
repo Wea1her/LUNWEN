@@ -1,4 +1,4 @@
-# 期刊论文大纲（V4+ 框架对齐版）
+# 期刊论文大纲（V5 同步版）
 
 ## 题目
 
@@ -75,8 +75,8 @@
 
 ### 4.2 选择与部署协议
 
-- checkpoint 指标支持 `constrained_fee / hypervolume / two_stage`；
-- 两阶段选择：`feasible_rate` 优先，`feasible_set_fee` 次优先；
+- 默认 checkpoint 指标为 `two_stage`；
+- 两阶段选择：`feasible_rate` 优先，`feasible_set_fee` 次优先，`risk_adjusted_fee` 辅助；
 - 运行档位：`aggressive / balanced / conservative`。
 
 ---
@@ -98,14 +98,16 @@
 
 ### 5.3 基线与对照
 
-- FIFO / Gas Priority / Heuristic / Fee-Risk Linear / Fair-Fee；
-- 可选增强：Center-Aware Greedy。
+- FIFO / Gas Priority / Heuristic Risk-Aware / Fee-Risk Linear / Fair-Fee Greedy；
+- V5 强基线：Center-Insertion Heuristic / Dynamic Tri-Objective Greedy；
+- 含参数基线在固定验证池上调参。
 
 ### 5.4 评价指标
 
-- 主指标：fee, fairness, risk, top10 risk, packing, composite；
-- 约束指标：feasible rate, feasible fee mean, violation count；
-- 解释指标：wait p95/p99, wait gini, risk rank。
+- 主指标：`block_fee`, `fairness`, `old_tx_pack_rate`, `risk_exposure`, `edge10_risk`, `risky_inclusion_rate`, `gas_util`, `packing_ratio`；
+- 约束指标：`feasible_rate`, `feasible_fee_mean`, `violation_count`；
+- 诊断指标：非法动作率、非法截断率、连续非法动作长度、推理时间；
+- 解释指标：`wait_p95/p99`, `wait_gini`, `risky_rank`, `late_promo`。
 
 ### 5.5 证据等级
 
@@ -118,9 +120,11 @@
 
 ### 6.1 主实验表格
 
-- `table_main_core.tex`（核心结论）；
-- `table_main_fullmetrics.tex`（全指标）；
-- `table_main_constraints.tex`（约束结果）。
+- `table_main_core.tex`（V5 核心结论）；
+- `table_main_fullmetrics.tex`（全指标和诊断指标）；
+- `table_main_constraints.tex`（约束结果）；
+- `table_baseline_params.tex`（验证池调参结果）；
+- `table_seed_level_significance.tex`（seed 级正式统计）。
 
 ### 6.2 新增策略与瓶颈表
 
@@ -139,7 +143,8 @@
 
 ### 7.1 奖励/结构消融
 
-- 输出 `delta_vs_full` 与 `pareto_tag`；
+- 奖励消融采用 `AgeOnly / Age+Risk / Age+TerminalFair / FullBalanced`；
+- 结构消融采用 `No-SeqSummary / No-ActionMask / No-STOP / Ours-Full`；
 - 若某消融在部分指标优于 Full，解释为 trade-off shift，而非方法退化矛盾。
 
 ### 7.2 行为解释
@@ -162,3 +167,7 @@
 - 更真实链上数据与部署评估；
 - 面向 DEX/PBS/FSS 的扩展；
 - 约束强化学习与多智能体博弈建模。
+
+## 九、2026-06-30 同步回填
+
+论文大纲已同步 V5 当前实现：分层奖励、7 类基线、验证池调参、seed 级统计、No-ActionMask 诊断和推理时间指标均已纳入第 4、5、6、7 部分的写作口径。

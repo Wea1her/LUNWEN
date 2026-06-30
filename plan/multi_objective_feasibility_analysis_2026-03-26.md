@@ -200,3 +200,15 @@
 
 - **当前阶段重点优化 fairness，不是 fee。**
 - 你的收益已经够强，短板在公平约束穿透能力；先把可行率做起来，三目标“尽可能最优”才成立。
+
+## 9) 2026-06-30 V5 落地回填
+
+该分析中的核心判断已经转化为 V5 实验协议和代码实现：
+
+- 主线默认选模改为 `two_stage`，不再把 `hypervolume` 作为默认正式口径；
+- `hypervolume` 保留为协议消融或对照设置，用于分析不同选模规则带来的 trade-off；
+- 含参数基线已在固定验证池上调参，避免 PPO 与基线比较不公平；
+- 正式统计改为以独立训练 seed 为单位，避免把测试 episode 误当作独立重复；
+- 论文结果叙事从“单点最优”调整为“可行率优先下的多目标折中”。
+
+后续若继续优化 fairness，可基于 V5 当前输出的 `constraint_bottleneck_report.json`、`operating_points_summary.json` 和 `seed_level_statistics.json` 决定是否进入约束强化学习或动态乘子版本。

@@ -39,3 +39,5 @@ chapters/journal/*.toc
 chapters/journal/missfont.log
 # Ignore dry-run experiment outputs
 *dryrun*/
+
+*results*/

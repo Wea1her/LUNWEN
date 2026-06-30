@@ -126,6 +126,11 @@ class TxOrderingEnv(gym.Env):
         self._max_gas = 1
         self._done = False
         self._invalid_action_streak = 0
+        self._invalid_action_count = 0
+        self._invalid_truncation_count = 0
+        self._max_invalid_streak = 0
+        self._invalid_streak_lengths: list[int] = []
+        self._action_count = 0
         self._terminal_reward_applied = False
         self._pool_oldest_ids: set[int] = set()
         self._pool_late_high_ids: set[int] = set()
@@ -169,6 +174,11 @@ class TxOrderingEnv(gym.Env):
         self._step_count = 0
         self._done = False
         self._invalid_action_streak = 0
+        self._invalid_action_count = 0
+        self._invalid_truncation_count = 0
+        self._max_invalid_streak = 0
+        self._invalid_streak_lengths = []
+        self._action_count = 0
         self._terminal_reward_applied = False
 
         self._max_fee = max(tx.fee for tx in self._pool) if self._pool else 1.0
@@ -206,9 +216,13 @@ class TxOrderingEnv(gym.Env):
 
         valid = self._valid_indices()
         stop_idx = len(self._candidates)
+        self._action_count += 1
 
         # STOP 动作
         if action == stop_idx:
+            if self._invalid_action_streak > 0:
+                self._invalid_streak_lengths.append(self._invalid_action_streak)
+                self._invalid_action_streak = 0
             stop_penalty = self._compute_stop_penalty(valid)
             self._proxy_stop_penalty += stop_penalty
             terminal_reward = self._apply_terminal_reward()
@@ -219,14 +233,20 @@ class TxOrderingEnv(gym.Env):
         # 无效动作: 不终止, 施加小惩罚, 状态不变
         if action not in valid:
             self._invalid_action_streak += 1
+            self._invalid_action_count += 1
+            self._max_invalid_streak = max(self._max_invalid_streak, self._invalid_action_streak)
             penalty = -self.eta * (1.0 + 0.1 * self._invalid_action_streak)
             if self.no_action_mask or self._invalid_action_streak >= max(len(self._candidates), 10):
+                self._invalid_truncation_count += 1
+                self._invalid_streak_lengths.append(self._invalid_action_streak)
                 terminal_reward = self._apply_terminal_reward()
                 self._done = True
                 return self._obs(), penalty + terminal_reward, True, False, self._info()
             return self._obs(), penalty, False, False, self._info()
 
         tx = self._candidates[action]
+        if self._invalid_action_streak > 0:
+            self._invalid_streak_lengths.append(self._invalid_action_streak)
         self._invalid_action_streak = 0
 
         # 计算即时奖励
@@ -694,6 +714,13 @@ class TxOrderingEnv(gym.Env):
             wait_p99 = 0.0
             wait_gini = 0.0
 
+        invalid_lengths = list(self._invalid_streak_lengths)
+        if self._invalid_action_streak > 0:
+            invalid_lengths.append(self._invalid_action_streak)
+        mean_invalid_streak = float(np.mean(invalid_lengths)) if invalid_lengths else 0.0
+        invalid_action_rate = self._invalid_action_count / max(self._action_count, 1)
+        invalid_truncation_rate = self._invalid_truncation_count / max(self._action_count, 1)
+
         return {
             "selected": [tx.tid for tx in self._selected],
             "total_fee": self._acc_fee,
@@ -704,6 +731,13 @@ class TxOrderingEnv(gym.Env):
             "wait_p95": wait_p95,
             "wait_p99": wait_p99,
             "wait_gini": wait_gini,
+            "action_count": self._action_count,
+            "invalid_action_count": self._invalid_action_count,
+            "invalid_action_rate": invalid_action_rate,
+            "invalid_truncation_count": self._invalid_truncation_count,
+            "invalid_truncation_rate": invalid_truncation_rate,
+            "max_invalid_streak": self._max_invalid_streak,
+            "mean_consecutive_invalid_actions": mean_invalid_streak,
             "reward_decomposition": {
                 "fee_reward": self._proxy_fee_reward,
                 "age_reward": self._proxy_age_reward,

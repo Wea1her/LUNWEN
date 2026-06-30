@@ -49,68 +49,76 @@
 
 （4）非法动作处理：若智能体选择了不属于 $\mathcal{A}_t^{\text{valid}}$ 的交易，环境不执行该动作，状态保持不变，并给予负奖励惩罚。在关闭动作掩码的结构消融场景下，环境会在非法动作出现后提前结束回合，以避免无效循环。
 
+
 \subsection{奖励函数}
 
-奖励函数设计为手续费收益、等待时间均衡增益、风险抑制和动作有效性四项的加权组合。当智能体在时间步 $t$ 选择交易 $tx_{\pi(t)}$ 时，即时奖励为：
+为避免训练奖励与实验指标之间出现语义错位，本文在实现中采用分层奖励函数，而非简单的四项线性组合。总体奖励写为：
 
 \begin{equation}
-  r_t = \alpha \cdot r_t^{\text{fee}} + \beta \cdot \Delta r_t^{\text{fair}} - \gamma \cdot r_t^{\text{risk}} + \eta \cdot r_t^{\text{valid}}
+  r_t = r_t^{\text{step}} + r_t^{\text{terminal}} + r_t^{\text{valid}}
 \end{equation}
 
-其中 $\alpha, \beta, \gamma, \eta$ 为预设权重系数。各分量定义如下。
+其中，$r_t^{\text{step}}$ 为逐笔选择时的即时引导项，$r_t^{\text{terminal}}$ 为区块构建结束后的全局约束项，$r_t^{\text{valid}}$ 为非法动作与终止行为约束项。三部分仍服务于手续费收益、等待公平和位置敏感风险控制三类目标。
 
-手续费收益项 $r_t^{\text{fee}}$ 为选中交易的归一化手续费：
+单步奖励定义为：
 
 \begin{equation}
-  r_t^{\text{fee}} = \frac{\text{fee}(tx_{\pi(t)})}{\max_{tx \in \mathcal{T}} \text{fee}(tx)}
+  r_t^{\text{step}}
+  =
+  \alpha r_t^{\text{fee}}
+  + g_t^{\text{fair}}\beta_{age} r_t^{\text{age}}
+  + g_t^{\text{fair}}\beta_{old} r_t^{\text{oldest}}
+  - \gamma_r r_t^{\text{risk}}
+  + \omega_p r_t^{\text{packing}}
+  + \omega_l r_t^{\text{latefee}} .
 \end{equation}
 
-公平性项采用增量式定义，而非静态等待时间奖励。本文以 Jain 指数作为等待时间均衡性度量，定义增量公平奖励为：
+手续费收益项 $r_t^{\text{fee}}$ 为所选交易手续费相对于候选池最大手续费的归一化值；等待服务项 $r_t^{\text{age}}$ 为所选交易等待时间相对于当前交易池最大等待跨度的归一化值；$r_t^{\text{oldest}}$ 表示所选交易是否属于当前候选集合中等待时间最长的 oldest-$q$ 交易。$g_t^{\text{fair}}$ 为公平门控系数：当 Jain 公平性、oldest 覆盖率和饥饿比例未达到阈值时，等待相关奖励保持较高权重；当这些约束逐步满足后，等待项权重被压缩，使策略释放更多自由度优化收益与风险。
+
+风险惩罚项采用与评估指标一致的位置敏感设计。设当前相对位置为
 
 \begin{equation}
-  \Delta r_t^{\text{fair}} = J(S_t \cup \{tx_{\pi(t)}\}) - J(S_t)
+  \rho_t = \frac{k_t}{\max(\hat{K}-1,1)}, \qquad
+  \hat{K}=\max\left(\left\lfloor \frac{G_{\max}}{\bar{g}} \right\rfloor,1\right),
 \end{equation}
 
-其中 $S_t$ 表示时间步 $t$ 已选交易集合，$J(\cdot)$ 为基于等待时间序列的 Jain 指数。该定义直接优化全局均衡性增益，减少“训练奖励与评估指标语义错位”的问题。
-
-风险惩罚项仍保留“位置敏感”思想，但采用分段式权重以增强可解释性。设当前决策步相对位置为
+其中 $k_t$ 为已选交易数量，$\bar{g}$ 为候选池平均 Gas 消耗，$\hat{K}$ 为估计区块容量。位置权重采用以区块中部为低风险区域的平滑函数：
 
 \begin{equation}
-  \rho_t = \frac{t}{\hat{K}}, \qquad
-  \hat{K} = \max \left( \left\lfloor \frac{G_{\max}}{\bar{g}} \right\rfloor, 1 \right)
+  \phi(\rho_t)=1-\exp\left(-\frac{(\rho_t-\rho_c)^2}{2\sigma^2}\right),
+  \qquad \rho_c=0.5 .
 \end{equation}
 
-其中 $\bar{g}$ 表示当前回合候选交易池的平均 Gas 消耗估计，$\hat{K}$ 表示据此估计的单个区块可容纳交易数，而非候选池规模本身。当 $\hat{K} = 1$ 时，令 $\rho_t = 0.5$。位置惩罚函数定义为：
+于是
 
 \begin{equation}
-  \phi(\rho_t)=
-  \begin{cases}
-    1.0, & \rho_t < 0.1 \text{ 或 } \rho_t > 0.9 \\
-    0.0, & 0.4 \le \rho_t \le 0.6 \\
-    0.5, & \text{其他位置}
-  \end{cases}
+  r_t^{\text{risk}} = r_{\pi(t)}^{\text{risk}}\phi(\rho_t).
 \end{equation}
 
-于是风险项写为：
+该项使高风险交易在区块头尾敏感位置受到更强惩罚，而在中部位置受到较弱惩罚。$r_t^{\text{packing}}$ 按所选交易 Gas 占区块 Gas 上限的比例给出弱打包激励；$r_t^{\text{latefee}}$ 对后到达且高手续费、同时风险较低的交易给出弱恢复激励，以避免公平约束导致收益端过度保守。
+
+终止奖励在区块构建结束时一次性施加：
 
 \begin{equation}
-  r_t^{\text{risk}} = r_{\pi(t)}^{\text{risk}} \cdot \phi(\rho_t)
+  r_T^{\text{terminal}}
+  =
+  g_T^{\text{fair}}\beta_T J(S_T)
+  - g_T^{\text{fair}}\gamma_s R_T^{\text{starvation}}
+  - \gamma_e R_T^{\text{edge-risk}}
+  - \omega_g R_T^{\text{unused-gas}} .
 \end{equation}
 
-该设计使高风险交易位于头尾敏感区时受到更强惩罚，位于中间核心区时惩罚最小，符合抢跑/尾随攻击的常见位置特征。
+其中 $J(S_T)$ 为已选交易等待时间序列的 Jain 指数，$R_T^{\text{starvation}}$ 为 oldest-$q$ 交易未被服务比例，$R_T^{\text{edge-risk}}$ 综合最终序列中的风险暴露、Top-10\% 风险和高风险交易平均位置偏离，$R_T^{\text{unused-gas}}$ 为未使用 Gas 比例。该终止项用于约束最终区块序列，而非只依赖逐步局部奖励。
 
-有效性项 $r_t^{\text{valid}}$ 同时约束“过早终止”和“非法动作”两类无效决策。其定义为：
+有效性奖励包含非法动作惩罚和 \texttt{STOP} 惩罚：
+
 \begin{equation}
-  r_t^{\text{valid}}=
-  \begin{cases}
-    -\left(1+\bar{f}^{\text{rem}}_t \cdot \log\!\left(1+\left|\mathcal{A}_t^{\text{valid}}\right|\right)\right), & a_t=\texttt{STOP},\ \left|\mathcal{A}_t^{\text{valid}}\right|>0 \\
-    -\left(1+0.1\cdot n_t^{\text{inv}}\right), & a_t\notin \mathcal{A}_t^{\text{valid}} \\
-    0, & \text{其他情况}
-  \end{cases}
+  r_t^{\text{valid}} = r_t^{\text{invalid}} + r_t^{\text{stop}} .
 \end{equation}
-其中 $\bar{f}^{\text{rem}}_t$ 表示剩余合法候选交易的归一化平均手续费，$n_t^{\text{inv}}$ 表示当前回合内连续非法动作计数。该设计用于抑制“提前 \texttt{STOP} 逃避决策”与“连续输出非法动作”的策略行为；在 No-ActionMask 消融下，若非法动作连续累积超过阈值，环境会提前结束回合。
 
-在本文实验配置中，默认取 $\alpha = 1.0$、$\beta = 0.3$、$\gamma = 0.5$、$\eta = 0.1$。收益项保持主导地位，公平与风险项负责多目标折中，有效性项用于稳定训练行为边界。
+当动作不满足 Gas 或 Nonce 约束时，环境不执行该动作，并按连续非法动作次数递增惩罚；在关闭动作掩码的结构消融中，非法动作会触发提前截断以避免无效循环。当智能体在仍存在合法候选交易时选择 \texttt{STOP}，环境根据剩余手续费质量、oldest 未服务比例、未使用 Gas 和后到达高手续费未服务比例给出惩罚，抑制“过早停止以规避风险”的策略。
+
+在本文默认配置中，收益权重 $\alpha=1.0$，风险权重 $\gamma_r=0.5$，非法与提前停止基础权重 $\eta=0.1$；等待服务、oldest 覆盖、终止公平、饥饿惩罚、打包激励、后到达高手续费恢复和终止风险惩罚分别由代码配置中的 $\beta_{age}$、$\beta_{old}$、$\beta_T$、$\gamma_s$、$\omega_p$、$\omega_l$、$\gamma_e$ 控制。上述分解保证论文公式与实验实现一致。
 
 \subsection{优化目标}
 

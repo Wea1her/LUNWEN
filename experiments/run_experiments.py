@@ -26,7 +26,7 @@ from evaluate import (build_shared_pools, save_shared_pools, load_shared_pools,
                       build_fairness_decomposition, build_constrained_eval_summary,
                       build_operating_points_summary, build_constraint_bottleneck_report,
                       plot_training_curve)
-from baselines import run_baseline
+from baselines import run_baseline, grid_search_baseline_params
 from metrics import (compute_all_metrics, constrained_ranking, pareto_dominates,
                      summary_metric_bundle)
 from latex_tables import (generate_main_table, generate_robustness_table,
@@ -35,14 +35,19 @@ from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_main_core_table, generate_main_fullmetrics_table,
                           generate_pareto_main_table, generate_protocol_ablation_table,
                           generate_operating_points_table, generate_constraint_bottleneck_table,
+                          generate_baseline_params_table,
                           append_exploratory_note, append_primary_decision_rule_note,
                           ABLATION_ORDER, PROTOCOL_ABLATION_ORDER,
                           ABLATION_LABELS, STRUCT_ABLATION_ORDER,
                           STRUCT_ABLATION_LABELS, PROTOCOL_ABLATION_LABELS)
-from method_registry import MAIN_METHOD_ORDER, get_baseline_method_ids, normalize_method_id
+from method_registry import (MAIN_METHOD_ORDER, get_baseline_method_ids, normalize_method_id,
+                             method_registry_payload)
 from stat_tests import (SCIPY_AVAILABLE, run_paired_significance_tests,
                         format_paired_significance_table,
-                        generate_paired_significance_latex)
+                        generate_paired_significance_latex,
+                        run_seed_level_paired_tests,
+                        format_seed_level_significance_table,
+                        generate_seed_level_significance_latex)
 
 STAGE_ORDER = ["main", "robustness", "ablation"]
 
@@ -158,7 +163,14 @@ def _build_compact_order(selected: list, head: int = 12, tail: int = 12) -> dict
     }
 
 
-def _evaluate_method_on_pool(pool: list, method_id: str, model, device, env: TxOrderingEnv) -> dict:
+def _evaluate_method_on_pool(
+    pool: list,
+    method_id: str,
+    model,
+    device,
+    env: TxOrderingEnv,
+    baseline_params: dict | None = None,
+) -> dict:
     if method_id == "ours":
         obs, _ = env.reset_with_pool(pool)
         while True:
@@ -168,7 +180,8 @@ def _evaluate_method_on_pool(pool: list, method_id: str, model, device, env: TxO
                 break
         selected = env.get_selected_transactions()
     else:
-        selected = run_baseline(deepcopy(pool), method_id)
+        params = (baseline_params or {}).get(method_id, {})
+        selected = run_baseline(deepcopy(pool), method_id, params=params)
     metrics = compute_all_metrics(selected, pool)
     return {
         "metrics": metrics,
@@ -184,6 +197,7 @@ def _build_case_study_for_seed(
     shared_pools: list[list],
     raw: dict[str, list[dict]],
     result_dir: str,
+    baseline_params: dict | None = None,
 ) -> str | None:
     case_episode_ids = _select_case_episode_ids(raw, args.baseline_methods, max_cases=3)
     if not case_episode_ids:
@@ -196,7 +210,9 @@ def _build_case_study_for_seed(
         risk_tx_count = sum(1 for tx in pool if tx.risk_score >= C.HEURISTIC_RISK_THRESHOLD)
         method_details = {}
         for method_id in ["ours", *args.baseline_methods]:
-            method_details[method_id] = _evaluate_method_on_pool(pool, method_id, model, device, env)
+            method_details[method_id] = _evaluate_method_on_pool(
+                pool, method_id, model, device, env, baseline_params=baseline_params
+            )
         episodes_payload.append({
             "episode_id": episode_id,
             "shared_pool_id": episode_id,
@@ -221,7 +237,7 @@ def _build_case_study_for_seed(
     return case_path
 
 
-def _run_main_evaluation(model, device, args, seed, result_dir):
+def _run_main_evaluation(model, device, args, seed, result_dir, baseline_params=None):
     env = TxOrderingEnv(pool_size=args.pool_size, risk_ratio=C.RISK_RATIO, seed=seed)
     test_seed = seed + getattr(C, "TEST_POOL_SEED_OFFSET", 20000)
     shared_pool_path = _shared_pool_path(
@@ -249,7 +265,10 @@ def _run_main_evaluation(model, device, args, seed, result_dir):
 
     raw = {"ours": evaluate_rl(model, env, args.eval_episodes, device, shared_pools)}
     for bl in args.baseline_methods:
-        raw[bl] = evaluate_baseline(bl, env, args.eval_episodes, shared_pools)
+        raw[bl] = evaluate_baseline(
+            bl, env, args.eval_episodes, shared_pools,
+            baseline_params=(baseline_params or {}).get(bl, {}),
+        )
     agg = {method: aggregate(metrics) for method, metrics in raw.items()}
 
     _write_json(os.path.join(result_dir, "main_results.json"), agg)
@@ -293,11 +312,12 @@ def _run_main_evaluation(model, device, args, seed, result_dir):
         shared_pools=shared_pools,
         raw=raw,
         result_dir=result_dir,
+        baseline_params=baseline_params,
     )
     return agg, case_study_seed_path
 
 
-def _run_risk_robustness(model, device, args, seed, result_dir):
+def _run_risk_robustness(model, device, args, seed, result_dir, baseline_params=None):
     all_data = {}
     all_rows = []
     pool_index = {
@@ -332,7 +352,10 @@ def _run_risk_robustness(model, device, args, seed, result_dir):
 
         raw = {"ours": evaluate_rl(model, env, args.eval_episodes, device, shared_pools)}
         for bl in args.baseline_methods:
-            raw[bl] = evaluate_baseline(bl, env, args.eval_episodes, shared_pools)
+            raw[bl] = evaluate_baseline(
+                bl, env, args.eval_episodes, shared_pools,
+                baseline_params=(baseline_params or {}).get(bl, {}),
+            )
         all_data[str(rr)] = {method: aggregate(metrics) for method, metrics in raw.items()}
         all_rows.extend(_episode_rows(raw, "robustness_risk", {"risk_ratio": rr}, seed))
 
@@ -346,7 +369,7 @@ def _run_risk_robustness(model, device, args, seed, result_dir):
     return all_data
 
 
-def _run_pool_robustness(model, device, args, seed, result_dir):
+def _run_pool_robustness(model, device, args, seed, result_dir, baseline_params=None):
     all_data = {}
     all_rows = []
     pool_index = {
@@ -380,7 +403,10 @@ def _run_pool_robustness(model, device, args, seed, result_dir):
 
         raw = {"ours": evaluate_rl(model, env, args.eval_episodes, device, shared_pools)}
         for bl in args.baseline_methods:
-            raw[bl] = evaluate_baseline(bl, env, args.eval_episodes, shared_pools)
+            raw[bl] = evaluate_baseline(
+                bl, env, args.eval_episodes, shared_pools,
+                baseline_params=(baseline_params or {}).get(bl, {}),
+            )
         all_data[str(ps)] = {method: aggregate(metrics) for method, metrics in raw.items()}
         all_rows.extend(_episode_rows(raw, "robustness_pool_size", {"pool_size": ps}, seed))
 
@@ -394,7 +420,7 @@ def _run_pool_robustness(model, device, args, seed, result_dir):
     return all_data
 
 
-def _run_fee_robustness(model, device, args, seed, result_dir):
+def _run_fee_robustness(model, device, args, seed, result_dir, baseline_params=None):
     all_data = {}
     all_rows = []
     base_pool_file = _shared_pool_path(args.output, "test", f"test_pool_seed_{seed}_robust_fee_base.json")
@@ -448,7 +474,9 @@ def _run_fee_robustness(model, device, args, seed, result_dir):
             raw_rl.append(compute_all_metrics(selected_rl, pool))
 
             for bl in args.baseline_methods:
-                selected_bl = run_baseline(deepcopy(pool), bl)
+                selected_bl = run_baseline(
+                    deepcopy(pool), bl, params=(baseline_params or {}).get(bl, {})
+                )
                 raw_bl[bl].append(compute_all_metrics(selected_bl, pool))
 
         raw = {"ours": raw_rl}
@@ -463,6 +491,85 @@ def _run_fee_robustness(model, device, args, seed, result_dir):
         "records": all_rows,
     })
     return all_data
+
+
+def _prepare_baseline_params_for_seed(seed: int, args: argparse.Namespace, result_dir: str) -> tuple[dict, dict]:
+    """在固定验证池上为含参数基线选参，并落盘。"""
+    default_params = {method: {} for method in args.baseline_methods}
+    paths = {}
+    if getattr(args, "skip_baseline_tuning", False) or not getattr(C, "BASELINE_TUNING_ENABLED", True):
+        best_path = os.path.join(result_dir, "baseline_best_params.json")
+        payload = {
+            "enabled": False,
+            "reason": "disabled_by_cli_or_config",
+            "best_params": default_params,
+        }
+        _write_json(best_path, payload)
+        table_path = os.path.join(result_dir, "table_baseline_params.tex")
+        with open(table_path, "w") as f:
+            f.write(generate_baseline_params_table(default_params))
+        return default_params, {"baseline_best_params": best_path, "table_baseline_params": table_path}
+
+    validation_seed = seed + getattr(C, "VALIDATION_SEED_OFFSET", 10000) + 7000
+    val_pool_path = _shared_pool_path(
+        args.output,
+        "validation",
+        f"validation_pool_seed_{seed}_baseline_tuning.json",
+    )
+    val_pools, val_meta = _get_or_create_shared_pools(
+        val_pool_path,
+        args.val_episodes,
+        args.pool_size,
+        C.RISK_RATIO,
+        validation_seed,
+        metadata={
+            "pool_role": "validation",
+            "seed": seed,
+            "val_episodes": args.val_episodes,
+            "pool_size": args.pool_size,
+            "risk_ratio": C.RISK_RATIO,
+            "setting": "baseline_tuning",
+            "test_pool_not_used": True,
+            "baseline_methods": args.baseline_methods,
+        },
+    )
+    constraints = {
+        "fairness_floor": args.val_fairness_floor,
+        "oldest_coverage_floor": args.val_oldest_coverage_floor,
+        "risk_ceil": args.val_risk_ceil,
+        "top10_risk_ceil": args.val_top10_risk_ceil,
+    }
+    tuning, best_params = grid_search_baseline_params(
+        args.baseline_methods,
+        val_pools,
+        constraints=constraints,
+        operating_mode=getattr(args, "operating_mode", getattr(C, "OPERATING_MODE", "balanced")),
+    )
+    tuning_path = os.path.join(result_dir, "baseline_tuning.json")
+    best_path = os.path.join(result_dir, "baseline_best_params.json")
+    table_path = os.path.join(result_dir, "table_baseline_params.tex")
+    _write_json(tuning_path, {
+        "enabled": True,
+        "selection_pool": {"path": val_pool_path, "metadata": val_meta},
+        "selection_metric": "two_stage_selection_score",
+        "constraints": constraints,
+        "operating_mode": getattr(args, "operating_mode", getattr(C, "OPERATING_MODE", "balanced")),
+        "tuning": tuning,
+    })
+    _write_json(best_path, {
+        "enabled": True,
+        "selection_pool": {"path": val_pool_path, "metadata": val_meta},
+        "best_params": best_params,
+    })
+    with open(table_path, "w") as f:
+        f.write(generate_baseline_params_table(best_params))
+    paths.update({
+        "baseline_tuning": tuning_path,
+        "baseline_best_params": best_path,
+        "table_baseline_params": table_path,
+        "baseline_validation_pool": val_pool_path,
+    })
+    return best_params, paths
 
 
 def run_single_seed(seed, args_dict):
@@ -548,9 +655,17 @@ def run_single_seed(seed, args_dict):
     rob_fee = None
     main_episode_metrics_path = None
     case_study_seed_path = None
+    baseline_best_params = {method: {} for method in getattr(args, "baseline_methods", [])}
+    baseline_tuning_paths = {}
     requires_policy = bool(stages & {"main", "robustness"})
 
     if requires_policy:
+        baseline_best_params, baseline_tuning_paths = _prepare_baseline_params_for_seed(seed, args, result_dir)
+        seed_summary["baseline_best_params"] = baseline_best_params
+        seed_summary["baseline_tuning_outputs"] = {
+            key: os.path.relpath(path, args.output) for key, path in baseline_tuning_paths.items()
+        }
+
         model = ActorCritic().to(device)
         if os.path.exists(model_path):
             model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
@@ -567,22 +682,30 @@ def run_single_seed(seed, args_dict):
         if "main" in stages:
             print(f"[seed={seed}] 主实验评估", flush=True)
             t0 = time.perf_counter()
-            main_results, case_study_seed_path = _run_main_evaluation(model, device, args, seed, result_dir)
+            main_results, case_study_seed_path = _run_main_evaluation(
+                model, device, args, seed, result_dir, baseline_params=baseline_best_params
+            )
             timing["eval"] = time.perf_counter() - t0
             main_episode_metrics_path = os.path.join(result_dir, "main_episode_metrics.json")
 
         if "robustness" in stages:
             print(f"[seed={seed}] 鲁棒性实验 (风险比例)", flush=True)
             t0 = time.perf_counter()
-            rob_risk = _run_risk_robustness(model, device, args, seed, result_dir)
+            rob_risk = _run_risk_robustness(
+                model, device, args, seed, result_dir, baseline_params=baseline_best_params
+            )
             timing["robustness_risk"] = time.perf_counter() - t0
             print(f"[seed={seed}] 鲁棒性实验 (池大小)", flush=True)
             t1 = time.perf_counter()
-            rob_pool = _run_pool_robustness(model, device, args, seed, result_dir)
+            rob_pool = _run_pool_robustness(
+                model, device, args, seed, result_dir, baseline_params=baseline_best_params
+            )
             timing["robustness_pool"] = time.perf_counter() - t1
             print(f"[seed={seed}] 鲁棒性实验 (费率倍率)", flush=True)
             t2 = time.perf_counter()
-            rob_fee = _run_fee_robustness(model, device, args, seed, result_dir)
+            rob_fee = _run_fee_robustness(
+                model, device, args, seed, result_dir, baseline_params=baseline_best_params
+            )
             timing["robustness_fee"] = time.perf_counter() - t2
             timing["robustness"] = (
                 timing["robustness_risk"] + timing["robustness_pool"] + timing["robustness_fee"]
@@ -605,16 +728,23 @@ def run_single_seed(seed, args_dict):
         "case_study_seed_path": case_study_seed_path,
         "timing": timing,
         "seed_summary": seed_summary,
+        "baseline_best_params": baseline_best_params,
+        "baseline_tuning_paths": baseline_tuning_paths,
     }
 
 
-def aggregate_metric_grid(all_results):
-    """聚合形如 {setting: {method: metric_stats}} 的结果网格。"""
-    all_settings = set()
-    for result in all_results:
-        all_settings.update(result.keys())
-    settings = sorted(all_settings, key=str)
-    metrics = [
+def _metric_stat_value(stats: dict, metric: str):
+    """兼容普通 episode 指标和已聚合的特殊指标。"""
+    mean_key = f"{metric}_mean"
+    if mean_key in stats:
+        return stats[mean_key]
+    if metric in stats:
+        return stats[metric]
+    return None
+
+
+def _v5_metric_list() -> list[str]:
+    return [
         "block_fee",
         "fairness",
         "risk_exposure",
@@ -638,7 +768,25 @@ def aggregate_metric_grid(all_results):
         "composite_score",
         "constrained_fee_score",
         "risk_adjusted_fee_score",
+        "invalid_action_count",
+        "invalid_action_rate",
+        "invalid_truncation_count",
+        "invalid_truncation_rate",
+        "max_invalid_streak",
+        "mean_consecutive_invalid_actions",
+        "mean_inference_time",
+        "p95_inference_time",
+        "max_inference_time",
     ]
+
+
+def aggregate_metric_grid(all_results):
+    """聚合形如 {setting: {method: metric_stats}} 的结果网格。"""
+    all_settings = set()
+    for result in all_results:
+        all_settings.update(result.keys())
+    settings = sorted(all_settings, key=str)
+    metrics = _v5_metric_list()
 
     agg = {}
     for setting in settings:
@@ -656,7 +804,9 @@ def aggregate_metric_grid(all_results):
                 for result in all_results:
                     if method not in result.get(setting, {}):
                         continue
-                    vals.append(result[setting][method][f"{metric}_mean"])
+                    value = _metric_stat_value(result[setting][method], metric)
+                    if value is not None:
+                        vals.append(value)
                 if vals:
                     agg[setting][method][f"{metric}_mean"] = float(np.mean(vals))
                     agg[setting][method][f"{metric}_std"] = float(np.std(vals))
@@ -668,31 +818,7 @@ def aggregate_metric_grid(all_results):
 
 def aggregate_across_seeds(all_main=None, all_rob_risk=None, all_rob_pool=None, all_rob_fee=None):
     """跨种子聚合: 对每个方法的 mean 取均值和标准差"""
-    metrics = [
-        "block_fee",
-        "fairness",
-        "risk_exposure",
-        "edge_risk_ratio",
-        "edge10_risk",
-        "risky_inclusion_rate",
-        "gas_util",
-        "risky_rank",
-        "packing_ratio",
-        "top10_risk",
-        "late_promo",
-        "oldest_coverage",
-        "old_tx_pack_rate",
-        "starvation_gap",
-        "starvation_ratio",
-        "tail_wait_reduction",
-        "selected_wait_std",
-        "wait_p95",
-        "wait_p99",
-        "wait_gini",
-        "composite_score",
-        "constrained_fee_score",
-        "risk_adjusted_fee_score",
-    ]
+    metrics = _v5_metric_list()
 
     agg_main = {}
     if all_main:
@@ -709,7 +835,9 @@ def aggregate_across_seeds(all_main=None, all_rob_risk=None, all_rob_pool=None, 
                 for result in all_main:
                     if method not in result:
                         continue
-                    vals.append(result[method][f"{metric}_mean"])
+                    value = _metric_stat_value(result[method], metric)
+                    if value is not None:
+                        vals.append(value)
                 if vals:
                     agg_main[method][f"{metric}_mean"] = float(np.mean(vals))
                     agg_main[method][f"{metric}_std"] = float(np.std(vals))
@@ -1064,7 +1192,7 @@ def _apply_track_defaults(args):
 
     if args.track == "composite_optimal_track":
         if args.val_metric == C.VALIDATION_METRIC:
-            args.val_metric = "hypervolume"
+            args.val_metric = "two_stage"
         args.val_fairness_floor = max(args.val_fairness_floor, 0.90)
         args.val_oldest_coverage_floor = max(args.val_oldest_coverage_floor, 0.90)
         args.val_risk_ceil = min(args.val_risk_ceil, 0.30)
@@ -1253,19 +1381,7 @@ def _method_metric_summary(main_episode_rows: list[dict], method_id: str, metric
 
 def _build_seed_level_statistics(main_episode_rows: list[dict], baseline_methods: list[str], evidence_level: str) -> dict:
     """V5 统计摘要：先按独立训练 seed 聚合，再比较方法差值。"""
-    metrics = [
-        "block_fee",
-        "fairness",
-        "risk_exposure",
-        "edge10_risk",
-        "risky_inclusion_rate",
-        "gas_util",
-        "packing_ratio",
-        "old_tx_pack_rate",
-        "starvation_ratio",
-        "composite_score",
-        "risk_adjusted_fee_score",
-    ]
+    metrics = _v5_metric_list()
     methods = ["ours", *baseline_methods]
     by_seed: dict[int, dict[str, dict[str, float]]] = {}
     for row in main_episode_rows:
@@ -1291,7 +1407,13 @@ def _build_seed_level_statistics(main_episode_rows: list[dict], baseline_methods
                 for metric, values in metric_payload.items()
             }
 
-    lower_is_better = {"risk_exposure", "edge10_risk", "starvation_ratio"}
+    lower_is_better = {
+        "risk_exposure", "edge10_risk", "top10_risk", "starvation_ratio", "starvation_gap",
+        "selected_wait_std", "wait_p95", "wait_p99", "wait_gini",
+        "invalid_action_count", "invalid_action_rate", "invalid_truncation_count",
+        "invalid_truncation_rate", "max_invalid_streak", "mean_consecutive_invalid_actions",
+        "mean_inference_time", "p95_inference_time", "max_inference_time",
+    }
     paired = {}
     for baseline in baseline_methods:
         paired[baseline] = {}
@@ -1336,24 +1458,7 @@ def _build_seed_level_statistics(main_episode_rows: list[dict], baseline_methods
 
 
 def _build_behavior_probe(main_episode_rows: list[dict], baseline_methods: list[str]) -> dict:
-    metrics = [
-        "block_fee",
-        "fairness",
-        "risk_exposure",
-        "edge10_risk",
-        "risky_inclusion_rate",
-        "gas_util",
-        "risky_rank",
-        "top10_risk",
-        "risky_inclusion_rate",
-        "late_promo",
-        "oldest_coverage",
-        "old_tx_pack_rate",
-        "starvation_gap",
-        "starvation_ratio",
-        "tail_wait_reduction",
-        "composite_score",
-    ]
+    metrics = _v5_metric_list()
     summary_by_method = {}
     for method_id in ["ours", *baseline_methods]:
         summary_by_method[method_id] = {m: _method_metric_summary(main_episode_rows, method_id, m) for m in metrics}
@@ -1383,7 +1488,13 @@ def _build_behavior_probe(main_episode_rows: list[dict], baseline_methods: list[
                 base = float(base)
                 diff = ours - base
                 diffs.append(diff)
-                if metric in {"risk_exposure", "top10_risk", "starvation_gap"}:
+                if metric in {
+                    "risk_exposure", "edge10_risk", "top10_risk", "starvation_gap", "starvation_ratio",
+                    "selected_wait_std", "wait_p95", "wait_p99", "wait_gini",
+                    "invalid_action_count", "invalid_action_rate", "invalid_truncation_count",
+                    "invalid_truncation_rate", "max_invalid_streak", "mean_consecutive_invalid_actions",
+                    "mean_inference_time", "p95_inference_time", "max_inference_time",
+                }:
                     better_flags.append(1.0 if ours < base else 0.0)
                 elif metric == "risky_rank":
                     better_flags.append(1.0 if abs(ours - 0.5) < abs(base - 0.5) else 0.0)
@@ -1622,12 +1733,14 @@ def main():
                         help="跳过已有完整输出的 seed")
     parser.add_argument("--allow-random-fallback", action="store_true",
                         help="当 checkpoint 缺失时允许随机策略回退")
-    parser.add_argument("--enable-center-aware-baseline", dest="enable_center_aware_baseline",
+    parser.add_argument("--enable-strong-baseline", dest="enable_strong_baseline",
                         action="store_true", default=getattr(C, "ENABLE_STRONG_BASELINE_DEFAULT", True),
-                        help="启用 V5 强启发式基线 Dynamic Tri-Objective Greedy（默认启用）")
-    parser.add_argument("--disable-strong-baseline", dest="enable_center_aware_baseline",
+                        help="启用 V5 强启发式基线 Center-Insertion 和 Dynamic Tri-Objective Greedy（默认启用）")
+    parser.add_argument("--disable-strong-baseline", dest="enable_strong_baseline",
                         action="store_false",
                         help="关闭 V5 强启发式基线，仅保留五类基础基线")
+    parser.add_argument("--skip-baseline-tuning", action="store_true",
+                        help="跳过含参数基线的验证池网格调参，使用 config.py 默认参数")
     parser.add_argument("--track", type=str, default="composite_optimal_track",
                         choices=["fairness_recovery_track", "composite_optimal_track"],
                         help="正式协议轨道：fairness_recovery_track 或 composite_optimal_track")
@@ -1675,7 +1788,7 @@ def main():
     _resolve_stages(args)
     _apply_track_defaults(args)
     args.device_map = _parse_device_map(args.device_map)
-    args.baseline_methods = get_baseline_method_ids(args.enable_center_aware_baseline)
+    args.baseline_methods = get_baseline_method_ids(args.enable_strong_baseline)
 
     os.makedirs(args.output, exist_ok=True)
     device = resolve_device(args.device)
@@ -1701,6 +1814,7 @@ def main():
     print(f"Episodes: {args.episodes}")
     print(f"Pool size: {args.pool_size}")
     print(f"Baselines: {args.baseline_methods}")
+    print(f"Baseline tuning: {not args.skip_baseline_tuning and getattr(C, 'BASELINE_TUNING_ENABLED', True)}")
     print(f"Track: {args.track}")
     print(f"Operating mode: {args.operating_mode}")
     print(f"Constraint profile (eval/train): {args.constraint_profile}/{args.training_constraint_profile}")
@@ -1760,6 +1874,7 @@ def main():
     all_rob_fee = []
     main_episode_metric_paths = []
     case_study_seed_paths = []
+    baseline_best_params_by_seed = {}
     seed_timings = {}
     ablation_reward_seconds = 0.0
     ablation_struct_seconds = 0.0
@@ -1807,6 +1922,9 @@ def main():
                 existing_summary = _read_json_if_exists(seed_summary_path)
                 if isinstance(existing_summary, dict) and "timing_seconds" in existing_summary:
                     seed_timings[str(seed)] = existing_summary["timing_seconds"]
+                best_params_payload = _read_json_if_exists(os.path.join(result_dir, "baseline_best_params.json"))
+                if isinstance(best_params_payload, dict):
+                    baseline_best_params_by_seed[str(seed)] = best_params_payload.get("best_params", best_params_payload)
                 continue
 
             if args.resume and os.path.isdir(seed_dir):
@@ -1864,6 +1982,8 @@ def main():
                         case_study_seed_paths.append(result["case_study_seed_path"])
                     if result.get("timing") is not None:
                         seed_timings[str(seed)] = result["timing"]
+                    if result.get("baseline_best_params") is not None:
+                        baseline_best_params_by_seed[str(seed)] = result["baseline_best_params"]
 
                     print(
                         f"[seed={seed}] 结果已收集 "
@@ -1871,6 +1991,25 @@ def main():
                         f"{len(seeds_to_run)})",
                         flush=True,
                     )
+
+    if baseline_best_params_by_seed:
+        baseline_params_payload = {
+            "selection_unit": "per_training_seed_fixed_validation_pool",
+            "selection_metric": "two_stage_selection_score",
+            "test_pool_not_used_for_tuning": True,
+            "by_seed": baseline_best_params_by_seed,
+        }
+        baseline_best_path = os.path.join(args.output, "baseline_best_params.json")
+        baseline_table_path = os.path.join(args.output, "table_baseline_params.tex")
+        _write_json(baseline_best_path, baseline_params_payload)
+        with open(baseline_table_path, "w") as f:
+            f.write(generate_baseline_params_table(baseline_params_payload))
+        run_summary["outputs"]["baseline_best_params"] = os.path.basename(baseline_best_path)
+        run_summary["outputs"]["table_baseline_params"] = os.path.basename(baseline_table_path)
+
+    method_registry_path = os.path.join(args.output, "method_registry.json")
+    _write_json(method_registry_path, method_registry_payload())
+    run_summary["outputs"]["method_registry"] = os.path.basename(method_registry_path)
 
     run_summary["evidence_level"] = _infer_evidence_level(run_summary["seed_runs"])
 
@@ -1964,6 +2103,26 @@ def main():
             _write_json(seed_level_stats_path, seed_level_stats)
             run_summary["outputs"]["seed_level_statistics"] = os.path.basename(seed_level_stats_path)
 
+            if SCIPY_AVAILABLE:
+                print("\n===== Seed 级正式配对显著性检验 =====")
+                seed_sig = run_seed_level_paired_tests(seed_level_stats)
+                print(format_seed_level_significance_table(seed_sig))
+                seed_sig_path = os.path.join(args.output, "seed_level_paired_tests.json")
+                seed_sig_tex = os.path.join(args.output, "table_seed_level_significance.tex")
+                _write_json(seed_sig_path, seed_sig)
+                generate_seed_level_significance_latex(seed_sig, seed_sig_tex)
+                if seed_sig.get("exploratory_only"):
+                    with open(seed_sig_tex, "a") as f:
+                        f.write(
+                            f"% NOTE: Exploratory evidence ({run_summary['evidence_level']}); "
+                            "formal claims require enough independent training seeds.\n"
+                        )
+                run_summary["outputs"]["seed_level_paired_tests"] = os.path.basename(seed_sig_path)
+                run_summary["outputs"]["table_seed_level_significance"] = os.path.basename(seed_sig_tex)
+            else:
+                print("\n===== Seed 级正式配对显著性检验 =====")
+                print("Warning: scipy 未安装, 跳过 seed-level paired tests。")
+
             fairness_decomp = _build_fairness_decomposition_from_rows(
                 main_episode_rows,
                 args.baseline_methods,
@@ -2039,7 +2198,7 @@ def main():
 
         if SCIPY_AVAILABLE:
             if main_episode_rows:
-                print("\n===== Episode 级配对显著性检验 =====")
+                print("\n===== Episode 级配对显著性检验（诊断/附录） =====")
                 sig = run_paired_significance_tests(main_episode_rows)
                 print(format_paired_significance_table(sig))
                 sig_path = os.path.join(args.output, "paired_significance_tests.json")
@@ -2055,10 +2214,10 @@ def main():
                 run_summary["outputs"]["paired_significance_json"] = os.path.basename(sig_path)
                 run_summary["outputs"]["paired_significance_table"] = os.path.basename(sig_tex)
             else:
-                print("\n===== Episode 级配对显著性检验 =====")
+                print("\n===== Episode 级配对显著性检验（诊断/附录） =====")
                 print("Warning: 未找到 main_episode_metrics.json，已跳过。")
         else:
-            print("\n===== Episode 级配对显著性检验 =====")
+            print("\n===== Episode 级配对显著性检验（诊断/附录） =====")
             print("Warning: scipy 未安装, 跳过显著性检验与对应 LaTeX 表格生成。")
 
     if "ablation" in args.stages:
@@ -2181,14 +2340,17 @@ def main():
             "test_pools_frozen_on_disk": os.path.isdir(os.path.join(args.output, "pools", "test")),
         },
         "baseline_protocol": {
-            "strong_baseline_enabled": bool(args.enable_center_aware_baseline),
-            "strong_baseline_name": "Dynamic Tri-Objective Greedy",
+            "strong_baseline_enabled": bool(args.enable_strong_baseline),
+            "strong_baseline_names": ["Center-Insertion Heuristic", "Dynamic Tri-Objective Greedy"],
+            "dynamic_tri_objective_is_stepwise": True,
+            "baseline_tuning": "fixed_validation_pool_grid_search",
             "baseline_methods": args.baseline_methods,
         },
         "statistics_protocol": {
             "primary_unit": "independent_training_seed",
-            "episode_level_tests_are_diagnostic_only_when_nonformal": True,
-            "multiple_comparison_correction": "pending_for_formal_v5",
+            "seed_level_paired_tests": "paired_t_with_cohens_dz_bootstrap_ci_holm",
+            "episode_level_tests_are_diagnostic_only": True,
+            "multiple_comparison_correction": "Holm-Bonferroni",
         },
         "scope_boundary": (
             "risk_score is a proxy for position-sensitive ordering risk; "
@@ -2209,6 +2371,11 @@ def main():
         "operating_points_summary",
         "constraint_bottleneck_report",
         "seed_level_statistics",
+        "seed_level_paired_tests",
+        "table_seed_level_significance",
+        "baseline_best_params",
+        "table_baseline_params",
+        "method_registry",
         "v5_protocol_manifest",
         "narrative_guard",
     ]

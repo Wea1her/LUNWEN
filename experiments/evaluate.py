@@ -6,6 +6,7 @@ from copy import deepcopy
 import dataclasses
 import os
 import json
+import time
 import numpy as np
 import torch
 
@@ -74,10 +75,23 @@ def load_shared_pools(path: str) -> list[list[Transaction]]:
     ]
 
 
+def _runtime_diagnostics(elapsed_seconds: float, info: dict | None = None) -> dict:
+    info = info or {}
+    return {
+        "inference_time": float(elapsed_seconds),
+        "invalid_action_count": float(info.get("invalid_action_count", 0.0)),
+        "invalid_action_rate": float(info.get("invalid_action_rate", 0.0)),
+        "invalid_truncation_count": float(info.get("invalid_truncation_count", 0.0)),
+        "invalid_truncation_rate": float(info.get("invalid_truncation_rate", 0.0)),
+        "max_invalid_streak": float(info.get("max_invalid_streak", 0.0)),
+        "mean_consecutive_invalid_actions": float(info.get("mean_consecutive_invalid_actions", 0.0)),
+    }
+
+
 def evaluate_rl(model: ActorCritic, env: TxOrderingEnv,
                 n_episodes: int, device: torch.device,
                 shared_pools: list[list] | None = None) -> list[dict]:
-    """运行训练好的 RL 模型, 收集指标"""
+    """运行训练好的 RL 模型, 收集指标。"""
     results = []
     pools = shared_pools if shared_pools is not None else [None] * n_episodes
     for pool in pools:
@@ -85,44 +99,58 @@ def evaluate_rl(model: ActorCritic, env: TxOrderingEnv,
             obs, _ = env.reset()
         else:
             obs, _ = env.reset_with_pool(pool)
+        t0 = time.perf_counter()
+        info = {}
         while True:
             action, _, _ = model.act(obs, device, greedy=True)
             obs, _, done, _, info = env.step(action)
             if done:
                 break
+        elapsed = time.perf_counter() - t0
         selected = env.get_selected_transactions()
         pool = env.get_pool()
         m = compute_all_metrics(selected, pool)
+        m.update(_runtime_diagnostics(elapsed, info))
         results.append(m)
     return results
 
 
 def evaluate_baseline(method: str, env: TxOrderingEnv,
                       n_episodes: int,
-                      shared_pools: list[list] | None = None) -> list[dict]:
-    """运行基线方法, 收集指标"""
+                      shared_pools: list[list] | None = None,
+                      baseline_params: dict | None = None) -> list[dict]:
+    """运行基线方法, 收集指标。"""
     results = []
     pools = shared_pools if shared_pools is not None else [None] * n_episodes
+    params = dict(baseline_params or {})
     for pool in pools:
         if pool is None:
             env.reset()
         else:
             env.reset_with_pool(pool)
         current_pool = env.get_pool()
-        selected = run_baseline(deepcopy(current_pool), method)
+        t0 = time.perf_counter()
+        selected = run_baseline(deepcopy(current_pool), method, params=params)
+        elapsed = time.perf_counter() - t0
         m = compute_all_metrics(selected, current_pool)
+        m.update(_runtime_diagnostics(elapsed))
         results.append(m)
     return results
 
 
 def aggregate(results: list[dict]) -> dict:
-    """聚合指标: 计算均值和标准差"""
+    """聚合指标: 计算均值、标准差和推理时间分位数。"""
     keys = results[0].keys()
     agg = {}
     for k in keys:
         vals = [r[k] for r in results]
         agg[f"{k}_mean"] = float(np.mean(vals))
         agg[f"{k}_std"] = float(np.std(vals))
+    if "inference_time" in keys:
+        vals = [float(r["inference_time"]) for r in results]
+        agg["mean_inference_time"] = float(np.mean(vals))
+        agg["p95_inference_time"] = float(np.quantile(vals, 0.95))
+        agg["max_inference_time"] = float(np.max(vals))
     return agg
 
 

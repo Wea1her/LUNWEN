@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 
 @dataclass(frozen=True)
@@ -50,8 +50,14 @@ METHOD_SPECS: dict[str, MethodSpec] = {
         latex_name="Fair-Fee Greedy",
         is_baseline=True,
     ),
-    "center_aware": MethodSpec(
-        method_id="center_aware",
+    "center_insertion": MethodSpec(
+        method_id="center_insertion",
+        display_name="Center-Insertion Heuristic",
+        latex_name="Center-Insertion Heuristic",
+        is_baseline=True,
+    ),
+    "dynamic_tri_objective": MethodSpec(
+        method_id="dynamic_tri_objective",
         display_name="Dynamic Tri-Objective Greedy",
         latex_name="Dynamic Tri-Objective Greedy",
         is_baseline=True,
@@ -66,11 +72,15 @@ LEGACY_METHOD_ALIASES: dict[str, str] = {
     "HEURISTIC": "heuristic",
     "FeeRiskLinear": "fee_risk_linear",
     "FairFee": "fair_fee",
-    "CenterAwareGreedy": "center_aware",
+    "center_aware": "center_insertion",
+    "CenterAwareGreedy": "center_insertion",
+    "Center-Insertion Heuristic": "center_insertion",
+    "DynamicTriObjectiveGreedy": "dynamic_tri_objective",
+    "Dynamic Tri-Objective Greedy": "dynamic_tri_objective",
 }
 
 DEFAULT_BASELINE_METHOD_IDS = ["fifo", "gas", "heuristic", "fee_risk_linear", "fair_fee"]
-STRONG_BASELINE_METHOD_IDS = ["center_aware"]
+STRONG_BASELINE_METHOD_IDS = ["center_insertion", "dynamic_tri_objective"]
 MAIN_METHOD_ORDER = [*DEFAULT_BASELINE_METHOD_IDS, *STRONG_BASELINE_METHOD_IDS, "ours"]
 BASELINE_METHOD_IDS = [*DEFAULT_BASELINE_METHOD_IDS, *STRONG_BASELINE_METHOD_IDS]
 
@@ -96,3 +106,12 @@ def display_name(method_id: str) -> str:
 
 def latex_name(method_id: str) -> str:
     return METHOD_SPECS[normalize_method_id(method_id)].latex_name
+
+
+def method_registry_payload() -> dict:
+    return {
+        "method_order": MAIN_METHOD_ORDER,
+        "baseline_methods": BASELINE_METHOD_IDS,
+        "legacy_aliases": LEGACY_METHOD_ALIASES,
+        "methods": {k: asdict(v) for k, v in METHOD_SPECS.items()},
+    }

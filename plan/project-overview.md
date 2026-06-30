@@ -1,12 +1,12 @@
-# 项目概览（V4 对齐版）
+# 项目概览（V5 同步版）
 
 ## 一、项目基本信息
 
 - **作者**：陈庆贺
 - **学校**：天津理工大学 计算机科学与工程学院
 - **项目方向**：区块链交易排序优化 / 深度强化学习 / 风险控制
-- **当前阶段**：实验框架改造落地（two-stage + operating points）与正文组织
-- **当前主线任务**：围绕“可行率优先、可行域收益次优先”协议完成正式实验与论文回填
+- **当前阶段**：V5 实验代码与论文初稿同步改造完成，等待小规模 GPU smoke test 与正式结果回填
+- **当前主线任务**：围绕 V5 分层奖励、强基线、验证池调参和 seed 级统计完成正式实验与论文结果回填
 
 ---
 
@@ -57,23 +57,20 @@
   - 高风险交易位置惩罚；
   - 非法动作 / 提前停止惩罚。
 
-### 3.5 当前实验协议（V4）
+### 3.5 当前实验协议（V5）
 
-当前实验框架以 V4 方案为准，具有以下特点：
+当前实验框架以 V5 方案为准，具有以下特点：
 
-- 主实验、三类鲁棒性与两类消融都使用**共享评估池**；
-- 鲁棒性实验分为：
-  - 风险比例鲁棒性；
-  - 候选池规模鲁棒性；
-  - 风险费率倍率鲁棒性；
-- 消融实验分为：
-  - 奖励消融；
-  - 结构消融；
-- constrained 主协议采用两阶段选择：`feasible_rate` 优先，`feasible_set_fee` 次优先；
-- 支持 `aggressive / balanced / conservative` 三档 operating mode；
-- 正式报告输出固定包含：`core/full/constraints` 主表 + `operating points` + `constraint bottleneck`；
-- 显著性检验采用证据等级门控：`dryrun_single_seed / multi_seed_exploratory / formal_multi_seed`；
-- `pool_size` 被限制在环境支持的 `[50, 500]` 范围内。
+- 主实验、三类鲁棒性与两类消融都使用共享评估池；
+- 默认 checkpoint 选模指标为 `two_stage`，即可行率优先、可行子集收益次优先、风险调整收益辅助；
+- 强基线正式包含 `Center-Insertion Heuristic` 与 `Dynamic Tri-Objective Greedy`；
+- 含参数基线在固定验证池上调参，测试池不参与调参；
+- 奖励函数按单步奖励、终止奖励和有效性奖励三层描述；
+- 奖励消融采用 `AgeOnly / Age+Risk / Age+TerminalFair / FullBalanced`；
+- 结构消融额外报告非法动作率、非法截断率和连续非法动作长度；
+- 正式统计以独立训练 seed 为单位，episode 级配对检验仅作诊断；
+- 正式报告输出 baseline tuning、method registry、seed-level statistics、推理时间和 V5 protocol manifest。
+
 
 ### 3.6 论文当前三个创新点（建议版）
 
@@ -104,17 +101,18 @@
 
 ### 3.8 当前基线方法
 
-当前固定基线包括：
+当前正式基线包括 7 类：
 
 1. FIFO
 2. Gas Priority
 3. Heuristic Risk-Aware
 4. Fee-Risk Linear
 5. Fair-Fee Greedy
+6. Center-Insertion Heuristic
+7. Dynamic Tri-Objective Greedy
 
-可选补充基线：
+其中后两类为 V5 强启发式基线。`center_aware` 仅作为 legacy alias 保留，不再作为论文正式方法名。
 
-6. Center-Aware Greedy
 
 ### 3.9 当前主要风险点
 
@@ -157,8 +155,8 @@
 
 - `plan/project-overview.md`：项目总览；
 - `plan/outline.md`：期刊论文与毕业论文大纲；
-- `plan/experiment-framework-v4.md`：当前正式使用的第四版实验方案；
-- `plan/experiment-framework-code-change-plan-2026-03-24-narrative-aligned.md`：实验框架改造任务；
+- `plan/experiment-framework-v4.md`：第四版历史方案，已被 V5 方案取代；
+- `plan/实验代码与论文同步改造清单.md`：V5 代码与论文同步改造任务；
 - `plan/experiment-run-commands-2026-03-26.md`：预验与正式运行命令。
 
 ### 5.2 实验代码
@@ -197,7 +195,7 @@
 ### 第三阶段：增强投稿质量
 
 - 补行为解释实验；
-- 补强基线（如 Center-Aware Greedy）；
+- 复核 V5 强基线、验证池调参和 seed 级统计产物；
 - 统一术语、图表编号、表格顺序与文件命名；
 - 完成终稿润色。
 
@@ -212,3 +210,7 @@
 - 让新协议（feasible-rate first）在代码和报告中完全一致；
 - 把实验结果与论文结构、表格口径完全对齐；
 - 先高质量完成期刊论文，再向毕业论文扩展。
+
+## 八、2026-06-30 同步回填
+
+本文件已从 V4 项目概览更新为 V5 当前状态。后续项目管理以 `plan/第五版实验方案.md` 和 `plan/实验代码与论文同步改造清单.md` 为主，V4 文档仅作为历史记录。

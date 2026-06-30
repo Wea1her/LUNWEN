@@ -396,3 +396,17 @@ r_t = \alpha r_{fee}(t) + \beta \Delta r_{fair}(t) - \gamma r_{risk}(t) + \eta r
 7. 正文表格顺序、代码配置、输出文件命名三者保持一致。
 
 若以上 7 条全部满足，则 V4 可以作为论文送审前的正式实验方案。
+
+## 13. 2026-06-30 V5 迁移说明
+
+本文件保留为 V4 历史方案，不再作为当前正式实验协议。当前正式口径以 `plan/第五版实验方案.md` 为准。主要迁移点如下：
+
+1. 奖励函数由旧四项表述迁移为 `step + terminal + valid` 分层奖励；
+2. 基线由 5 类基础基线扩展为 7 类，新增 `Center-Insertion Heuristic` 和 `Dynamic Tri-Objective Greedy`；
+3. 奖励消融由 `FeeOnly / Fee+Fair / Fee+Risk / Full Reward` 迁移为 `AgeOnly / Age+Risk / Age+TerminalFair / FullBalanced`；
+4. checkpoint 默认选模由旧综合或 hypervolume 口径迁移为 `two_stage`；
+5. 正式统计由 episode 级或 Welch 口径迁移为 seed 级 paired test + bootstrap CI + Holm 校正；
+6. No-ActionMask 结构消融新增非法动作率、非法截断率和连续非法动作诊断；
+7. 评估新增平均、P95 和最大推理时间输出。
+
+引用实验方案时，应引用 V5 文档；引用本文件时需明确其为历史方案。

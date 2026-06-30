@@ -119,16 +119,16 @@ def _generate_metric_table(agg: dict, metrics: list[tuple[str, int, bool | None]
 
 
 def generate_main_core_table(agg: dict) -> str:
-    """主叙事核心表（收益-公平-风险-约束）。"""
+    """主叙事核心表（V5 收益-等待公平-风险-效率指标）。"""
     metrics = [
         ("block_fee", 1, True),
         ("fairness", 4, True),
+        ("old_tx_pack_rate", 4, True),
         ("risk_exposure", 4, False),
-        ("top10_risk", 4, False),
+        ("edge10_risk", 4, False),
+        ("risky_inclusion_rate", 4, True),
         ("gas_util", 4, True),
         ("packing_ratio", 4, True),
-        ("composite_score", 4, True),
-        ("constrained_fee_score", 4, True),
     ]
     return _generate_metric_table(agg, metrics)
 
@@ -159,6 +159,13 @@ def generate_main_fullmetrics_table(agg: dict) -> str:
         ("composite_score", 4, True),
         ("constrained_fee_score", 4, True),
         ("risk_adjusted_fee_score", 4, True),
+        ("invalid_action_rate", 4, False),
+        ("invalid_truncation_rate", 4, False),
+        ("max_invalid_streak", 2, False),
+        ("mean_consecutive_invalid_actions", 2, False),
+        ("mean_inference_time", 4, False),
+        ("p95_inference_time", 4, False),
+        ("max_inference_time", 4, False),
     ]
     return _generate_metric_table(agg, metrics)
 
@@ -294,6 +301,29 @@ def generate_constraint_bottleneck_table(payload: dict) -> str:
             f"{latex_name(method_id)} & ${feas:.4f}$ & ${violation_count}$ & ${infeasible_count}$ & {top1} \\\\"
         )
     return "\n".join(lines) + "\n"
+
+
+def _latex_escape_text(text: str) -> str:
+    return str(text).replace("_", r"\_")
+
+
+def generate_baseline_params_table(best_params_payload: dict) -> str:
+    """生成基线验证池调参结果表。"""
+    if "by_seed" in best_params_payload:
+        by_seed = best_params_payload.get("by_seed", {})
+    else:
+        by_seed = {"--": best_params_payload}
+    lines = []
+    for seed, method_params in sorted(by_seed.items(), key=lambda kv: str(kv[0])):
+        for method_id in MAIN_METHOD_ORDER:
+            if method_id == "ours" or method_id not in method_params:
+                continue
+            params = method_params.get(method_id) or {}
+            param_text = ", ".join(f"{k}={v}" for k, v in sorted(params.items())) if params else "default/fixed"
+            lines.append(
+                f"{_latex_escape_text(seed)} & {latex_name(method_id)} & {_latex_escape_text(param_text)} \\\\"
+            )
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
 def append_primary_decision_rule_note(table_rows: str) -> str:

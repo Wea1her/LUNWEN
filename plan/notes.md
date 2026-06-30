@@ -15,3 +15,12 @@
 - 第 5 章统计口径已更新为 episode 级配对检验（paired t-test + Wilcoxon signed-rank），并保留跨 seed 均值±标准差作为稳定性报告。
 - 第 5 章环境描述已更新为 `correlated_v1` 交易池生成机制，明确 `fee/risk/arrival/hist_delay` 的相关性建模。
 - 第 3 章 `r_t^{valid}` 已改为同时覆盖“提前 STOP 惩罚”和“非法动作惩罚”。
+
+## 2026-06-30
+
+- 当前正式口径升级为 V5：默认验证指标为 `two_stage`，正式结论以独立训练 seed 为统计单位。
+- `paired_significance_tests.json` 仍可生成，但只作为共享测试池 episode 级诊断；正文显著性结论应引用 `seed_level_paired_tests.json` 和 `table_seed_level_significance.tex`。
+- 奖励函数在论文中按 `step + terminal + valid` 分层描述，不再使用旧四项奖励作为实现公式。
+- 奖励消融统一使用 `AgeOnly / Age+Risk / Age+TerminalFair / FullBalanced`。
+- V5 强基线默认启用：`Center-Insertion Heuristic` 与 `Dynamic Tri-Objective Greedy`；`center_aware` 仅保留为 legacy alias。
+- 论文不声明真实 MEV 防护效果，MEV 仅作为位置敏感排序风险的动机之一。
