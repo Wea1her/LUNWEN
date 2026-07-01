@@ -121,8 +121,8 @@ CONSTRAINED_RANK_MIN_FEASIBLE_RATE = 0.30
 SCORE_POLICY_VERSION = "v20260324_narrative_aligned"
 RANKING_POLICY_VERSION = "tiered_feasible_rate_then_feasible_fee"
 SELECTION_POLICY_VERSION = "v20260326_two_stage_operating_points"
-OPERATING_MODE = "balanced"  # aggressive / balanced / conservative
-OPERATING_MODES = ("aggressive", "balanced", "conservative")
+OPERATING_MODE = "balanced"  # aggressive / balanced / conservative / risk_aware
+OPERATING_MODES = ("aggressive", "balanced", "conservative", "risk_aware")
 OPERATING_MODE_WEIGHTS = {
     # 先保证可行率，再看可行域收益；激进档更偏收益，保守档更偏可行率。
     "aggressive": {
@@ -143,7 +143,47 @@ OPERATING_MODE_WEIGHTS = {
         "feasible_fee": 4.0,
         "risk_adjusted_fee": 2.0,
     },
+    "risk_aware": {
+        "tier": 7.0,
+        "feasible_rate": 5.0,
+        "feasible_fee": 5.0,
+        "risk_adjusted_fee": 6.0,
+    },
 }
+
+# ========== 多目标折中得分 ==========
+TRADE_SCORE_POLICY_VERSION = "v20260701_plan_multi_objective"
+TRADE_SCORE_RISK_REF = VALIDATION_RISK_CEIL
+TRADE_SCORE_EDGE_REF = VALIDATION_TOP10_RISK_CEIL
+TRADE_SCORE_WEIGHTS = {
+    "fee": 0.25,
+    "fairness": 0.20,
+    "old_tx": 0.10,
+    "gas": 0.10,
+    "packing": 0.05,
+    "risk_safety": 0.20,
+    "edge_safety": 0.10,
+}
+RISK_AWARE_TRADE_SCORE_WEIGHTS = {
+    "fee": 0.20,
+    "fairness": 0.20,
+    "old_tx": 0.10,
+    "gas": 0.10,
+    "packing": 0.05,
+    "risk_safety": 0.25,
+    "edge_safety": 0.10,
+}
+CONSTRAINED_TRADE_FAIRNESS_MIN = 0.90
+CONSTRAINED_TRADE_RISK_MAX = 0.15
+CONSTRAINED_TRADE_EDGE_MAX = 0.08
+CONSTRAINED_TRADE_GAS_MIN = 0.95
+CONSTRAINED_TRADE_MU_GAS = 0.10
+CONSTRAINED_TRADE_MU_PACKING = 0.05
+CONSTRAINED_TRADE_LAMBDA_FAIRNESS = 1.0
+CONSTRAINED_TRADE_LAMBDA_RISK = 1.0
+CONSTRAINED_TRADE_LAMBDA_EDGE = 1.0
+CONSTRAINED_TRADE_LAMBDA_GAS = 1.0
+
 CONSTRAINT_PROFILE = "strict"  # strict / relaxed_for_training
 TRAINING_CONSTRAINT_PROFILE = "relaxed_for_training"
 CONSTRAINT_PROFILES = ("strict", "relaxed_for_training")

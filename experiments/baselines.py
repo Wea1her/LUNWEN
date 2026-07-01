@@ -42,17 +42,21 @@ def _apply_nonce_order(txs: List[Transaction], block_gas_limit: int | None = Non
     selected: List[Transaction] = []
     remaining = list(txs)
     gas_left = int(block_gas_limit) if block_gas_limit is not None else _effective_gas_limit(txs)
+    selected_nonces: dict[int, int] = {}
 
     while remaining:
         progress = False
         next_remaining = []
-        valid_indices = set(_valid_candidate_indices(remaining, selected, gas_left))
-        for idx, tx in enumerate(remaining):
-            if idx not in valid_indices:
+        for tx in remaining:
+            if tx.gas > gas_left:
+                next_remaining.append(tx)
+                continue
+            if tx.nonce > 0 and selected_nonces.get(tx.sender, -1) < tx.nonce - 1:
                 next_remaining.append(tx)
                 continue
             selected.append(tx)
             gas_left -= tx.gas
+            selected_nonces[tx.sender] = max(selected_nonces.get(tx.sender, -1), tx.nonce)
             progress = True
         remaining = next_remaining
         if not progress:

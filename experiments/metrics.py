@@ -204,6 +204,88 @@ def composite_score(metrics: dict,
     )
 
 
+def _fee_norm(metrics: dict, pool: List[Transaction] | None = None) -> float:
+    if pool:
+        pool_fee = sum(tx.fee for tx in pool)
+        return float(metrics.get("block_fee", 0.0)) / max(pool_fee, 1e-8)
+    return float(metrics.get("block_fee_norm", 0.0))
+
+
+def risk_safety_score(metrics: dict, risk_ref: float | None = None) -> float:
+    """将越低越好的 risk_exposure 转换为 [0,1] 风险安全得分。"""
+    ref = float(risk_ref if risk_ref is not None else getattr(C, "TRADE_SCORE_RISK_REF", C.VALIDATION_RISK_CEIL))
+    risk = float(np.clip(metrics.get("risk_exposure", 0.0), 0.0, 1.0))
+    return float(1.0 - min(risk / max(ref, 1e-8), 1.0))
+
+
+def edge_risk_safety_score(metrics: dict, edge_ref: float | None = None) -> float:
+    """将越低越好的 edge10_risk 转换为 [0,1] 头尾风险安全得分。"""
+    ref = float(edge_ref if edge_ref is not None else getattr(C, "TRADE_SCORE_EDGE_REF", C.VALIDATION_TOP10_RISK_CEIL))
+    edge = float(np.clip(metrics.get("edge10_risk", 0.0), 0.0, 1.0))
+    return float(1.0 - min(edge / max(ref, 1e-8), 1.0))
+
+
+def multi_objective_trade_score(
+    metrics: dict,
+    pool: List[Transaction] | None = None,
+    weights: dict | None = None,
+    risk_ref: float | None = None,
+    edge_ref: float | None = None,
+) -> float:
+    """计划文档中的 S_trade: 收益、等待公平、效率和风险安全的加权折中分。"""
+    w = dict(weights or getattr(C, "TRADE_SCORE_WEIGHTS", {}))
+    fee = float(np.clip(_fee_norm(metrics, pool), 0.0, 1.0))
+    fairness = float(np.clip(metrics.get("fairness", 0.0), 0.0, 1.0))
+    old_tx = float(np.clip(metrics.get("old_tx_pack_rate", metrics.get("oldest_coverage", 0.0)), 0.0, 1.0))
+    gas = float(np.clip(metrics.get("gas_util", 0.0), 0.0, 1.0))
+    packing = float(np.clip(metrics.get("packing_ratio", 0.0), 0.0, 1.0))
+    risk_safe = risk_safety_score(metrics, risk_ref=risk_ref)
+    edge_safe = edge_risk_safety_score(metrics, edge_ref=edge_ref)
+    return float(
+        float(w.get("fee", 0.0)) * fee
+        + float(w.get("fairness", 0.0)) * fairness
+        + float(w.get("old_tx", 0.0)) * old_tx
+        + float(w.get("gas", 0.0)) * gas
+        + float(w.get("packing", 0.0)) * packing
+        + float(w.get("risk_safety", 0.0)) * risk_safe
+        + float(w.get("edge_safety", 0.0)) * edge_safe
+    )
+
+
+def risk_aware_trade_score(metrics: dict, pool: List[Transaction] | None = None) -> float:
+    """计划文档中的 S_risk-aware: 强化风险安全权重的折中分。"""
+    return multi_objective_trade_score(
+        metrics,
+        pool=pool,
+        weights=getattr(C, "RISK_AWARE_TRADE_SCORE_WEIGHTS", C.TRADE_SCORE_WEIGHTS),
+    )
+
+
+def constrained_trade_score(metrics: dict, pool: List[Transaction] | None = None) -> float:
+    """计划文档中的 S_constrained: 以收益/效率为基础，对约束违反施加 hinge penalty。"""
+    fee = float(np.clip(_fee_norm(metrics, pool), 0.0, 1.0))
+    gas = float(np.clip(metrics.get("gas_util", 0.0), 0.0, 1.0))
+    packing = float(np.clip(metrics.get("packing_ratio", 0.0), 0.0, 1.0))
+    fairness = float(metrics.get("fairness", 0.0))
+    risk = float(metrics.get("risk_exposure", 1.0))
+    edge = float(metrics.get("edge10_risk", 1.0))
+
+    fair_gap = max(float(getattr(C, "CONSTRAINED_TRADE_FAIRNESS_MIN", 0.90)) - fairness, 0.0)
+    risk_gap = max(risk - float(getattr(C, "CONSTRAINED_TRADE_RISK_MAX", 0.15)), 0.0)
+    edge_gap = max(edge - float(getattr(C, "CONSTRAINED_TRADE_EDGE_MAX", 0.08)), 0.0)
+    gas_gap = max(float(getattr(C, "CONSTRAINED_TRADE_GAS_MIN", 0.95)) - gas, 0.0)
+
+    return float(
+        fee
+        + float(getattr(C, "CONSTRAINED_TRADE_MU_GAS", 0.10)) * gas
+        + float(getattr(C, "CONSTRAINED_TRADE_MU_PACKING", 0.05)) * packing
+        - float(getattr(C, "CONSTRAINED_TRADE_LAMBDA_FAIRNESS", 1.0)) * fair_gap
+        - float(getattr(C, "CONSTRAINED_TRADE_LAMBDA_RISK", 1.0)) * risk_gap
+        - float(getattr(C, "CONSTRAINED_TRADE_LAMBDA_EDGE", 1.0)) * edge_gap
+        - float(getattr(C, "CONSTRAINED_TRADE_LAMBDA_GAS", 1.0)) * gas_gap
+    )
+
+
 def constrained_success_score(metrics: dict,
                               constraints: dict | None = None,
                               target_metric: str = "block_fee_norm",
@@ -608,4 +690,9 @@ def compute_all_metrics(selected: List[Transaction],
         target_metric="block_fee_norm",
     )
     metrics["risk_adjusted_fee_score"] = risk_adjusted_fee_score(metrics)
+    metrics["risk_safety_score"] = risk_safety_score(metrics)
+    metrics["edge_risk_safety_score"] = edge_risk_safety_score(metrics)
+    metrics["trade_score"] = multi_objective_trade_score(metrics, pool)
+    metrics["risk_aware_trade_score"] = risk_aware_trade_score(metrics, pool)
+    metrics["constrained_trade_score"] = constrained_trade_score(metrics, pool)
     return metrics

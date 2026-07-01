@@ -2,6 +2,7 @@
 
 import json
 
+import config as C
 from method_registry import MAIN_METHOD_ORDER, latex_name, normalize_method_id
 
 ABLATION_ORDER = ["Ours-AgeOnly", "Ours-Age+Risk", "Ours-Age+TerminalFair", "Ours-FullBalanced"]
@@ -159,6 +160,11 @@ def generate_main_fullmetrics_table(agg: dict) -> str:
         ("composite_score", 4, True),
         ("constrained_fee_score", 4, True),
         ("risk_adjusted_fee_score", 4, True),
+        ("risk_safety_score", 4, True),
+        ("edge_risk_safety_score", 4, True),
+        ("trade_score", 4, True),
+        ("risk_aware_trade_score", 4, True),
+        ("constrained_trade_score", 4, True),
         ("invalid_action_rate", 4, False),
         ("invalid_truncation_rate", 4, False),
         ("max_invalid_streak", 2, False),
@@ -226,6 +232,22 @@ def generate_composite_table(agg: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def generate_tradeoff_table(agg: dict) -> str:
+    """生成多目标折中得分表: S_trade / S_risk-aware / S_constrained。"""
+    agg = _normalize_method_keyed_dict(agg)
+    metrics = [
+        ("trade_score", 4, True),
+        ("risk_aware_trade_score", 4, True),
+        ("constrained_trade_score", 4, True),
+        ("risk_safety_score", 4, True),
+        ("edge_risk_safety_score", 4, True),
+    ]
+    present = [m for m in MAIN_METHOD_ORDER if m in agg and all(f"{met}_mean" in agg[m] for met, _, _ in metrics)]
+    if not present:
+        return ""
+    return _generate_metric_table(agg, metrics)
+
+
 def generate_fairness_decomp_table(payload: dict) -> str:
     """生成 fairness 分解表。"""
     methods = payload.get("methods", {})
@@ -265,7 +287,7 @@ def generate_constrained_main_table(payload: dict) -> str:
 def generate_operating_points_table(payload: dict) -> str:
     """生成三档 operating points 对比表。"""
     modes = payload.get("modes", {})
-    mode_order = ["aggressive", "balanced", "conservative"]
+    mode_order = list(getattr(C, "OPERATING_MODES", ("aggressive", "balanced", "conservative")))
     lines = []
     for mode in mode_order:
         row = modes.get(mode, {})
@@ -371,6 +393,8 @@ def generate_protocol_ablation_table(agg: dict, order=None, labels=None) -> str:
         ("constrained_fee_score", 4),
         ("risk_adjusted_fee_score", 4),
         ("composite_score", 4),
+        ("trade_score", 4),
+        ("risk_aware_trade_score", 4),
     ]
     present = [m for m in order if m in agg]
     lines = []

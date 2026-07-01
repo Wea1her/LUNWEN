@@ -259,7 +259,7 @@ def build_constrained_eval_summary(raw: dict[str, list[dict]],
 
 def build_operating_points_summary(constrained_summary: dict) -> dict:
     methods = constrained_summary.get("methods", {})
-    mode_list = ["aggressive", "balanced", "conservative"]
+    mode_list = list(getattr(C, "OPERATING_MODES", ("aggressive", "balanced", "conservative")))
     payload = {
         "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
         "default_mode": getattr(C, "OPERATING_MODE", "balanced"),

@@ -6,6 +6,7 @@ import argparse
 import os
 import json
 import random
+import time
 import torch
 import numpy as np
 
@@ -16,6 +17,64 @@ from ppo import PPOTrainer, RolloutBuffer
 from device_utils import resolve_device, seed_everything
 from evaluate import aggregate, build_shared_pools, evaluate_rl, save_shared_pools
 from metrics import compute_all_metrics, two_stage_selection_score
+
+
+PROGRESS_FILENAME = "training_progress.json"
+
+
+def _write_training_progress(output_dir: str, payload: dict) -> None:
+    """原子写入训练进度，便于外部实时查询当前 episode。"""
+    os.makedirs(output_dir, exist_ok=True)
+    progress = dict(payload)
+    progress["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
+    path = os.path.join(output_dir, PROGRESS_FILENAME)
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(progress, f, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, path)
+
+
+def _progress_payload(
+    args: argparse.Namespace,
+    status: str,
+    current_episode: int,
+    started_at: float,
+    current_stage: int | None = None,
+    last_reward: float | None = None,
+    last_fee: float | None = None,
+    last_steps: int | None = None,
+    best_episode: int | None = None,
+    best_score: float | None = None,
+    last_validation_episode: int | None = None,
+    note: str | None = None,
+) -> dict:
+    total = int(args.episodes)
+    current = int(current_episode)
+    payload = {
+        "status": status,
+        "seed": int(args.seed),
+        "current_episode": current,
+        "total_episodes": total,
+        "progress_pct": round((current / total) * 100.0, 4) if total else 0.0,
+        "remaining_episodes": max(total - current, 0),
+        "current_stage": current_stage,
+        "elapsed_seconds": round(time.time() - started_at, 3),
+        "device": str(args.device),
+        "pool_size": int(args.pool_size),
+        "risk_ratio": float(args.risk_ratio),
+        "val_interval": int(args.val_interval),
+        "val_episodes": int(args.val_episodes),
+        "val_metric": str(args.val_metric),
+        "best_episode": best_episode,
+        "best_score": best_score,
+        "last_validation_episode": last_validation_episode,
+        "last_reward": last_reward,
+        "last_fee": last_fee,
+        "last_steps": last_steps,
+    }
+    if note:
+        payload["note"] = note
+    return payload
 
 
 def _higher_is_better(metric: str) -> bool:
@@ -250,16 +309,24 @@ def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
             * max(1.0 - top10, 0.0)
             * max(oldest, 1e-6)
         ),
+        "trade_score": float(agg.get("trade_score_mean", 0.0)),
+        "risk_aware_trade": float(agg.get("risk_aware_trade_score_mean", 0.0)),
+        "constrained_trade": float(agg.get("constrained_trade_score_mean", 0.0)),
     }
 
 
 def train(args, env_kwargs: dict | None = None):
     base_env_kwargs = dict(env_kwargs or {})
     device = resolve_device(args.device)
+    progress_started_at = time.time()
+    _write_training_progress(
+        args.output,
+        _progress_payload(args, "initializing", 0, progress_started_at, note="building model and data pools"),
+    )
     if device.type == "cuda":
-        print(f"Device: {device} ({torch.cuda.get_device_name(device)})")
+        print(f"Device: {device} ({torch.cuda.get_device_name(device)})", flush=True)
     else:
-        print(f"Device: {device}")
+        print(f"Device: {device}", flush=True)
 
     curriculum_enabled = bool(getattr(args, "curriculum", C.CURRICULUM_ENABLED))
     curriculum_cuts = tuple(getattr(args, "curriculum_stage_episodes", C.CURRICULUM_STAGE_EPISODES))
@@ -387,6 +454,10 @@ def train(args, env_kwargs: dict | None = None):
         "validation_risk_ceil": args.val_risk_ceil,
         "validation_top10_risk_ceil": args.val_top10_risk_ceil,
     })
+    _write_training_progress(
+        args.output,
+        _progress_payload(args, "training", 0, progress_started_at, current_stage=current_stage),
+    )
 
     best_score = -float("inf")
     best_episode = None
@@ -397,6 +468,9 @@ def train(args, env_kwargs: dict | None = None):
         "risk_aligned": {"score": -float("inf"), "episode": None, "file": "best_risk_aligned.pt"},
         "constrained_fee": {"score": -float("inf"), "episode": None, "file": "best_constrained_fee.pt"},
         "hypervolume": {"score": -float("inf"), "episode": None, "file": "best_hypervolume.pt"},
+        "trade_score": {"score": -float("inf"), "episode": None, "file": "best_trade_score.pt"},
+        "risk_aware_trade": {"score": -float("inf"), "episode": None, "file": "best_risk_aware_trade.pt"},
+        "constrained_trade": {"score": -float("inf"), "episode": None, "file": "best_constrained_trade.pt"},
     }
 
     for ep in range(1, args.episodes + 1):
@@ -464,6 +538,22 @@ def train(args, env_kwargs: dict | None = None):
         log["proxy_packing_reward"].append(info.get("proxy_packing_reward", 0.0))
         log["proxy_unused_gas_penalty"].append(info.get("proxy_unused_gas_penalty", 0.0))
         log["proxy_fairness_gate"].append(info.get("proxy_fairness_gate", 1.0))
+        _write_training_progress(
+            args.output,
+            _progress_payload(
+                args,
+                "training",
+                ep,
+                progress_started_at,
+                current_stage=current_stage,
+                last_reward=float(ep_reward),
+                last_fee=float(info.get("total_fee", 0)),
+                last_steps=int(info.get("num_selected", 0)),
+                best_episode=best_episode,
+                best_score=None if best_score == -float("inf") else float(best_score),
+                last_validation_episode=log["val_episode"][-1] if log["val_episode"] else None,
+            ),
+        )
 
         if ep % args.log_interval == 0:
             recent = log["reward"][-args.log_interval:]
@@ -474,9 +564,25 @@ def train(args, env_kwargs: dict | None = None):
                   f"AvgFee {avg_fee:>10.1f} | "
                   f"ActorLoss {a_loss:.4f} | "
                   f"CriticLoss {c_loss:.4f} | "
-                  f"Entropy {entropy:.4f}")
+                  f"Entropy {entropy:.4f}", flush=True)
 
         if ep % args.val_interval == 0 or ep == args.episodes:
+            _write_training_progress(
+                args.output,
+                _progress_payload(
+                    args,
+                    "validating",
+                    ep,
+                    progress_started_at,
+                    current_stage=current_stage,
+                    last_reward=float(ep_reward),
+                    last_fee=float(info.get("total_fee", 0)),
+                    last_steps=int(info.get("num_selected", 0)),
+                    best_episode=best_episode,
+                    best_score=None if best_score == -float("inf") else float(best_score),
+                    last_validation_episode=log["val_episode"][-1] if log["val_episode"] else None,
+                ),
+            )
             model.eval()
             val = _run_validation(model, device, args, validation_pools, base_env_kwargs)
             model.train()
@@ -501,6 +607,22 @@ def train(args, env_kwargs: dict | None = None):
                         model.state_dict(),
                         os.path.join(args.output, payload["file"]),
                     )
+            _write_training_progress(
+                args.output,
+                _progress_payload(
+                    args,
+                    "training" if ep < args.episodes else "finalizing",
+                    ep,
+                    progress_started_at,
+                    current_stage=current_stage,
+                    last_reward=float(ep_reward),
+                    last_fee=float(info.get("total_fee", 0)),
+                    last_steps=int(info.get("num_selected", 0)),
+                    best_episode=best_episode,
+                    best_score=None if best_score == -float("inf") else float(best_score),
+                    last_validation_episode=ep,
+                ),
+            )
 
     # 保存最终模型和训练日志
     torch.save(model.state_dict(),
@@ -580,7 +702,20 @@ def train(args, env_kwargs: dict | None = None):
                 "computed by the shared metric pipeline in evaluation."
             ),
         }, f, indent=2, ensure_ascii=False)
-    print(f"Training complete. Models saved to {args.output}/")
+    _write_training_progress(
+        args.output,
+        _progress_payload(
+            args,
+            "completed",
+            args.episodes,
+            progress_started_at,
+            current_stage=current_stage,
+            best_episode=best_episode,
+            best_score=None if best_score == -float("inf") else float(best_score),
+            last_validation_episode=log["val_episode"][-1] if log["val_episode"] else None,
+        ),
+    )
+    print(f"Training complete. Models saved to {args.output}/", flush=True)
     return {
         "best_episode": best_episode,
         "best_metric_key": best_metric_key,

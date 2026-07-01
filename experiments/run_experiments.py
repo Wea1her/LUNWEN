@@ -31,6 +31,7 @@ from metrics import (compute_all_metrics, constrained_ranking, pareto_dominates,
                      summary_metric_bundle)
 from latex_tables import (generate_main_table, generate_robustness_table,
                           generate_ablation_table, generate_composite_table,
+                          generate_tradeoff_table,
                           generate_fairness_decomp_table, generate_constrained_main_table,
                           generate_main_core_table, generate_main_fullmetrics_table,
                           generate_pareto_main_table, generate_protocol_ablation_table,
@@ -768,6 +769,11 @@ def _v5_metric_list() -> list[str]:
         "composite_score",
         "constrained_fee_score",
         "risk_adjusted_fee_score",
+        "risk_safety_score",
+        "edge_risk_safety_score",
+        "trade_score",
+        "risk_aware_trade_score",
+        "constrained_trade_score",
         "invalid_action_count",
         "invalid_action_rate",
         "invalid_truncation_count",
@@ -1222,6 +1228,9 @@ def _metric_winner_by_dimension(agg_main: dict) -> dict:
         ("packing_ratio_mean", True),
         ("composite_score_mean", True),
         ("constrained_fee_score_mean", True),
+        ("trade_score_mean", True),
+        ("risk_aware_trade_score_mean", True),
+        ("constrained_trade_score_mean", True),
     ]
     winner_map = {}
     for metric, higher in specs:
@@ -1745,9 +1754,9 @@ def main():
                         choices=["fairness_recovery_track", "composite_optimal_track"],
                         help="正式协议轨道：fairness_recovery_track 或 composite_optimal_track")
     parser.add_argument("--operating-mode", type=str,
-                        choices=["aggressive", "balanced", "conservative"],
+                        choices=list(getattr(C, "OPERATING_MODES", ("aggressive", "balanced", "conservative"))),
                         default=getattr(C, "OPERATING_MODE", "balanced"),
-                        help="运行策略档位：aggressive / balanced / conservative")
+                        help="运行策略档位：aggressive / balanced / conservative / risk_aware")
     parser.add_argument("--constraint-profile", type=str,
                         choices=["strict", "relaxed_for_training"],
                         default=getattr(C, "CONSTRAINT_PROFILE", "strict"),
@@ -2054,6 +2063,13 @@ def main():
                 f.write(append_exploratory_note(table_composite, run_summary["evidence_level"]))
             run_summary["outputs"]["table_composite_main"] = os.path.basename(table_composite_path)
 
+        table_tradeoff = generate_tradeoff_table(agg_main)
+        if table_tradeoff:
+            table_tradeoff_path = os.path.join(args.output, "table_tradeoff_main.tex")
+            with open(table_tradeoff_path, "w") as f:
+                f.write(append_exploratory_note(table_tradeoff, run_summary["evidence_level"]))
+            run_summary["outputs"]["table_tradeoff_main"] = os.path.basename(table_tradeoff_path)
+
         winner_payload = _metric_winner_by_dimension(agg_main)
         winner_path = os.path.join(args.output, "metric_winner_by_dimension.json")
         _write_json(winner_path, winner_payload)
@@ -2352,6 +2368,19 @@ def main():
             "episode_level_tests_are_diagnostic_only": True,
             "multiple_comparison_correction": "Holm-Bonferroni",
         },
+        "tradeoff_score_protocol": {
+            "policy_version": getattr(C, "TRADE_SCORE_POLICY_VERSION", "unknown"),
+            "trade_score_weights": getattr(C, "TRADE_SCORE_WEIGHTS", {}),
+            "risk_aware_trade_score_weights": getattr(C, "RISK_AWARE_TRADE_SCORE_WEIGHTS", {}),
+            "risk_ref": getattr(C, "TRADE_SCORE_RISK_REF", None),
+            "edge_ref": getattr(C, "TRADE_SCORE_EDGE_REF", None),
+            "constrained_thresholds": {
+                "fairness_min": getattr(C, "CONSTRAINED_TRADE_FAIRNESS_MIN", None),
+                "risk_max": getattr(C, "CONSTRAINED_TRADE_RISK_MAX", None),
+                "edge_max": getattr(C, "CONSTRAINED_TRADE_EDGE_MAX", None),
+                "gas_min": getattr(C, "CONSTRAINED_TRADE_GAS_MIN", None),
+            },
+        },
         "scope_boundary": (
             "risk_score is a proxy for position-sensitive ordering risk; "
             "results do not claim real on-chain MEV-defense effectiveness"
@@ -2365,6 +2394,7 @@ def main():
         "table_main_core",
         "table_main_fullmetrics",
         "table_main_constraints",
+        "table_tradeoff_main",
         "table_operating_points",
         "table_constraint_bottleneck",
         "constrained_eval_summary",
@@ -2390,6 +2420,7 @@ def main():
         "score_policy_version": C.SCORE_POLICY_VERSION,
         "ranking_policy_version": C.RANKING_POLICY_VERSION,
         "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "trade_score_policy_version": getattr(C, "TRADE_SCORE_POLICY_VERSION", "unknown"),
         "operating_mode": args.operating_mode,
     }
     outputs_manifest_path = os.path.join(args.output, "outputs_manifest.json")
