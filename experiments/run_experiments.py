@@ -104,6 +104,17 @@ def _training_schedule_payload(args: argparse.Namespace) -> dict:
     }
 
 
+def _checkpoint_selection_payload(args: argparse.Namespace) -> dict:
+    return {
+        "type": "smoothed_stability_validation_score",
+        "smoothing_window": int(getattr(args, "val_smoothing_window", getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1))),
+        "variance_penalty": float(getattr(args, "val_variance_penalty", getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0))),
+        "best_freeze": bool(getattr(args, "best_freeze", getattr(C, "BEST_FREEZE_ENABLED", False))),
+        "best_freeze_patience": int(getattr(args, "best_freeze_patience", getattr(C, "BEST_FREEZE_PATIENCE", 8))),
+        "best_freeze_min_episodes": int(getattr(args, "best_freeze_min_episodes", getattr(C, "BEST_FREEZE_MIN_EPISODES", 300))),
+    }
+
+
 def _risk_tuning_payload(args: argparse.Namespace) -> dict:
     payload = {}
     label = getattr(args, "risk_tune_label", None)
@@ -636,6 +647,7 @@ def run_single_seed(seed, args_dict):
     args = argparse.Namespace(**args_dict)
     risk_tuning = _apply_risk_tuning_overrides(args)
     training_schedule = _training_schedule_payload(args)
+    checkpoint_selection = _checkpoint_selection_payload(args)
     if isinstance(getattr(args, "device_map", None), dict) and seed in args.device_map:
         args.device = args.device_map[seed]
     stages = set(args.stages)
@@ -664,6 +676,7 @@ def run_single_seed(seed, args_dict):
         seed_summary["risk_tuning"] = risk_tuning
     if training_schedule["curriculum"] or training_schedule["lr_schedule"]:
         seed_summary["training_schedule"] = training_schedule
+    seed_summary["checkpoint_selection"] = checkpoint_selection
     timing = {
         "train": 0.0,
         "eval": 0.0,
@@ -697,6 +710,11 @@ def run_single_seed(seed, args_dict):
             val_episodes=args.val_episodes,
             val_interval=args.val_interval,
             val_metric=args.val_metric,
+            val_smoothing_window=args.val_smoothing_window,
+            val_variance_penalty=args.val_variance_penalty,
+            best_freeze=args.best_freeze,
+            best_freeze_patience=args.best_freeze_patience,
+            best_freeze_min_episodes=args.best_freeze_min_episodes,
             val_fairness_floor=args.val_fairness_floor,
             val_oldest_coverage_floor=args.val_oldest_coverage_floor,
             val_risk_ceil=args.val_risk_ceil,
@@ -1836,6 +1854,19 @@ def main():
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
+    parser.add_argument("--val-smoothing-window", type=int, default=getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1),
+                        help="用于 best checkpoint selection 的验证分数移动平均窗口")
+    parser.add_argument("--val-variance-penalty", type=float, default=getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0),
+                        help="best checkpoint selection 的验证分数标准差惩罚系数")
+    parser.add_argument("--best-freeze", dest="best_freeze", action="store_true",
+                        default=getattr(C, "BEST_FREEZE_ENABLED", False),
+                        help="验证分数长期无提升后冻结 best checkpoint")
+    parser.add_argument("--no-best-freeze", dest="best_freeze", action="store_false",
+                        help="关闭 best checkpoint 冻结")
+    parser.add_argument("--best-freeze-patience", type=int, default=getattr(C, "BEST_FREEZE_PATIENCE", 8),
+                        help="冻结 best checkpoint 前允许的无提升验证次数")
+    parser.add_argument("--best-freeze-min-episodes", type=int, default=getattr(C, "BEST_FREEZE_MIN_EPISODES", 300),
+                        help="允许冻结 best checkpoint 的最小训练 episode")
     parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
     parser.add_argument("--val-oldest-coverage-floor", type=float, default=C.VALIDATION_OLDEST_COVERAGE_FLOOR)
     parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
@@ -1882,6 +1913,7 @@ def main():
             args.val_top10_risk_ceil = float(eval_cons.get("top10_risk_ceil", args.val_top10_risk_ceil))
     risk_tuning = _apply_risk_tuning_overrides(args)
     training_schedule = _training_schedule_payload(args)
+    checkpoint_selection = _checkpoint_selection_payload(args)
     _resolve_stages(args)
     _apply_track_defaults(args)
     args.device_map = _parse_device_map(args.device_map)
@@ -1922,6 +1954,7 @@ def main():
         f"edge10_risk<={args.val_edge10_risk_ceil}, "
         f"top10_risk<={args.val_top10_risk_ceil}"
     )
+    print(f"Checkpoint selection: {checkpoint_selection}")
     if risk_tuning:
         print(f"Risk tuning: {risk_tuning}")
     if training_schedule["curriculum"] or training_schedule["lr_schedule"]:
@@ -1966,6 +1999,7 @@ def main():
         },
         "risk_tuning": risk_tuning,
         "training_schedule": training_schedule,
+        "checkpoint_selection": checkpoint_selection,
         "config_snapshot": os.path.basename(config_snapshot_path),
         "seeds": args.seeds,
         "seed_runs": [],
@@ -2465,6 +2499,7 @@ def main():
             "multiple_comparison_correction": "Holm-Bonferroni",
         },
         "training_schedule": training_schedule,
+        "checkpoint_selection": checkpoint_selection,
         "tradeoff_score_protocol": {
             "policy_version": getattr(C, "TRADE_SCORE_POLICY_VERSION", "unknown"),
             "trade_score_weights": getattr(C, "TRADE_SCORE_WEIGHTS", {}),
@@ -2518,6 +2553,7 @@ def main():
         "score_policy_version": C.SCORE_POLICY_VERSION,
         "ranking_policy_version": C.RANKING_POLICY_VERSION,
         "selection_policy_version": getattr(C, "SELECTION_POLICY_VERSION", C.RANKING_POLICY_VERSION),
+        "checkpoint_selection": checkpoint_selection,
         "trade_score_policy_version": getattr(C, "TRADE_SCORE_POLICY_VERSION", "unknown"),
         "operating_mode": args.operating_mode,
     }

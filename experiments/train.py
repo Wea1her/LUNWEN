@@ -45,6 +45,7 @@ def _progress_payload(
     last_steps: int | None = None,
     best_episode: int | None = None,
     best_score: float | None = None,
+    best_frozen: bool | None = None,
     last_validation_episode: int | None = None,
     note: str | None = None,
 ) -> dict:
@@ -72,6 +73,8 @@ def _progress_payload(
         "last_fee": last_fee,
         "last_steps": last_steps,
     }
+    if best_frozen is not None:
+        payload["best_frozen"] = bool(best_frozen)
     if note:
         payload["note"] = note
     return payload
@@ -304,6 +307,36 @@ def _lr_scale_for_stage(args: argparse.Namespace, stage: int) -> float:
     return float(scales[idx])
 
 
+def _stability_adjusted_score(raw_scores: list[float], window_size: int, variance_penalty: float) -> dict:
+    window_size = max(int(window_size), 1)
+    window = [float(score) for score in raw_scores[-window_size:]]
+    if not window:
+        return {
+            "score": -float("inf"),
+            "mean": -float("inf"),
+            "std": float("inf"),
+            "count": 0,
+            "window_size": window_size,
+        }
+    if not all(np.isfinite(score) for score in window):
+        return {
+            "score": -float("inf"),
+            "mean": -float("inf"),
+            "std": float("inf"),
+            "count": len(window),
+            "window_size": window_size,
+        }
+    mean_score = float(np.mean(window))
+    std_score = float(np.std(window)) if len(window) > 1 else 0.0
+    return {
+        "score": mean_score - float(variance_penalty) * std_score,
+        "mean": mean_score,
+        "std": std_score,
+        "count": len(window),
+        "window_size": window_size,
+    }
+
+
 def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
     fairness = float(agg.get("fairness_mean", 0.0))
     oldest = float(agg.get("oldest_coverage_mean", 0.0))
@@ -374,6 +407,11 @@ def train(args, env_kwargs: dict | None = None):
     args.fairness_first = fairness_first
     args.lr_schedule = bool(getattr(args, "lr_schedule", getattr(C, "LR_SCHEDULE_ENABLED", False)))
     args.lr_stage_scales = tuple(getattr(args, "lr_stage_scales", getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2))))
+    args.val_smoothing_window = max(1, int(getattr(args, "val_smoothing_window", getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1))))
+    args.val_variance_penalty = max(0.0, float(getattr(args, "val_variance_penalty", getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0))))
+    args.best_freeze = bool(getattr(args, "best_freeze", getattr(C, "BEST_FREEZE_ENABLED", False)))
+    args.best_freeze_patience = max(1, int(getattr(args, "best_freeze_patience", getattr(C, "BEST_FREEZE_PATIENCE", 8))))
+    args.best_freeze_min_episodes = max(0, int(getattr(args, "best_freeze_min_episodes", getattr(C, "BEST_FREEZE_MIN_EPISODES", 300))))
     active_env_kwargs = _curriculum_env_kwargs(base_env_kwargs, args, current_stage)
     train_pool_seed = args.seed + getattr(C, "TRAIN_POOL_SEED_OFFSET", 0)
     env = TxOrderingEnv(
@@ -422,6 +460,13 @@ def train(args, env_kwargs: dict | None = None):
         "val_episode": [],
         "val_metric": [],
         "val_score": [],
+        "val_selection_score": [],
+        "val_score_mean": [],
+        "val_score_std": [],
+        "val_selection_window_count": [],
+        "val_selection_ready": [],
+        "val_best_frozen": [],
+        "val_no_improvement_count": [],
         "warmstart": warmstart_history,
         "stage_switches": [],
     }
@@ -483,6 +528,11 @@ def train(args, env_kwargs: dict | None = None):
         "validation_risk_ceil": args.val_risk_ceil,
         "validation_edge10_risk_ceil": args.val_edge10_risk_ceil,
         "validation_top10_risk_ceil": args.val_top10_risk_ceil,  # diagnostic
+        "selection_smoothing_window": args.val_smoothing_window,
+        "selection_variance_penalty": args.val_variance_penalty,
+        "best_freeze_enabled": args.best_freeze,
+        "best_freeze_patience": args.best_freeze_patience,
+        "best_freeze_min_episodes": args.best_freeze_min_episodes,
     })
     _write_training_progress(
         args.output,
@@ -493,6 +543,12 @@ def train(args, env_kwargs: dict | None = None):
     best_episode = None
     best_metric_value = None
     best_metric_key = None
+    best_raw_score = None
+    best_score_mean = None
+    best_score_std = None
+    best_selection_window_count = 0
+    best_frozen = False
+    no_improvement_validations = 0
     multi_best = {
         "fairness_recovery": {"score": -float("inf"), "episode": None, "file": "best_fairness_recovery.pt"},
         "risk_aligned": {"score": -float("inf"), "episode": None, "file": "best_risk_aligned.pt"},
@@ -589,6 +645,7 @@ def train(args, env_kwargs: dict | None = None):
                 last_steps=int(info.get("num_selected", 0)),
                 best_episode=best_episode,
                 best_score=None if best_score == -float("inf") else float(best_score),
+                best_frozen=best_frozen,
                 last_validation_episode=log["val_episode"][-1] if log["val_episode"] else None,
             ),
         )
@@ -618,22 +675,56 @@ def train(args, env_kwargs: dict | None = None):
                     last_steps=int(info.get("num_selected", 0)),
                     best_episode=best_episode,
                     best_score=None if best_score == -float("inf") else float(best_score),
+                    best_frozen=best_frozen,
                     last_validation_episode=log["val_episode"][-1] if log["val_episode"] else None,
                 ),
             )
             model.eval()
             val = _run_validation(model, device, args, validation_pools, base_env_kwargs)
             model.train()
+            raw_val_score = float(val["score"])
             log["val_episode"].append(ep)
             log["val_metric"].append(val["metric_value"])
-            log["val_score"].append(val["score"])
-            if val["score"] > best_score:
-                best_score = val["score"]
-                best_episode = ep
-                best_metric_value = val["metric_value"]
-                best_metric_key = val["metric_key"]
-                torch.save(model.state_dict(),
-                           os.path.join(args.output, C.BEST_CHECKPOINT_NAME))
+            log["val_score"].append(raw_val_score)
+            selection = _stability_adjusted_score(
+                log["val_score"],
+                args.val_smoothing_window,
+                args.val_variance_penalty,
+            )
+            selection_score = float(selection["score"])
+            selection_ready = selection["count"] >= args.val_smoothing_window or ep == args.episodes
+            log["val_selection_score"].append(selection_score)
+            log["val_score_mean"].append(selection["mean"])
+            log["val_score_std"].append(selection["std"])
+            log["val_selection_window_count"].append(selection["count"])
+            log["val_selection_ready"].append(bool(selection_ready))
+
+            if selection_ready and not best_frozen:
+                if best_episode is None or selection_score > best_score:
+                    best_score = selection_score
+                    best_episode = ep
+                    best_metric_value = val["metric_value"]
+                    best_metric_key = val["metric_key"]
+                    best_raw_score = raw_val_score
+                    best_score_mean = selection["mean"]
+                    best_score_std = selection["std"]
+                    best_selection_window_count = selection["count"]
+                    no_improvement_validations = 0
+                    torch.save(model.state_dict(),
+                               os.path.join(args.output, C.BEST_CHECKPOINT_NAME))
+                elif best_episode is not None:
+                    no_improvement_validations += 1
+
+                if (
+                    args.best_freeze
+                    and best_episode is not None
+                    and ep >= args.best_freeze_min_episodes
+                    and no_improvement_validations >= args.best_freeze_patience
+                ):
+                    best_frozen = True
+
+            log["val_best_frozen"].append(bool(best_frozen))
+            log["val_no_improvement_count"].append(int(no_improvement_validations))
 
             extra_scores = _multi_checkpoint_scores(val["aggregate"], args)
             for ckpt_name, payload in multi_best.items():
@@ -658,6 +749,7 @@ def train(args, env_kwargs: dict | None = None):
                     last_steps=int(info.get("num_selected", 0)),
                     best_episode=best_episode,
                     best_score=None if best_score == -float("inf") else float(best_score),
+                    best_frozen=best_frozen,
                     last_validation_episode=ep,
                 ),
             )
@@ -688,11 +780,20 @@ def train(args, env_kwargs: dict | None = None):
                 "risk_adjusted_fee_lambda": C.RISK_ADJUSTED_FEE_LAMBDA,
             },
             "selection_rule": {
-                "type": "fixed_validation_pool",
+                "type": "fixed_validation_pool_smoothed_stability_score",
                 "validation_metric": args.val_metric,
                 "higher_is_better": _higher_is_better(args.val_metric),
                 "validation_episodes": args.val_episodes,
                 "validation_interval": args.val_interval,
+                "selection_score_log_key": "val_selection_score",
+                "raw_score_log_key": "val_score",
+                "smoothing_window": args.val_smoothing_window,
+                "variance_penalty": args.val_variance_penalty,
+                "best_freeze_enabled": args.best_freeze,
+                "best_freeze_patience": args.best_freeze_patience,
+                "best_freeze_min_episodes": args.best_freeze_min_episodes,
+                "best_frozen": best_frozen,
+                "no_improvement_validations": no_improvement_validations,
                 "validation_seed": validation_seed,
                 "validation_pool_file": os.path.basename(validation_pool_path),
                 "validation_pool_hash": validation_pool_hash,
@@ -704,6 +805,10 @@ def train(args, env_kwargs: dict | None = None):
                 "best_episode": best_episode,
                 "best_metric_key": best_metric_key,
                 "best_metric_value": best_metric_value,
+                "best_raw_score": best_raw_score,
+                "best_score_mean": best_score_mean,
+                "best_score_std": best_score_std,
+                "best_selection_window_count": best_selection_window_count,
                 "best_selection_score": best_score,
             },
             "warmstart": {
@@ -759,6 +864,7 @@ def train(args, env_kwargs: dict | None = None):
             current_stage=current_stage,
             best_episode=best_episode,
             best_score=None if best_score == -float("inf") else float(best_score),
+            best_frozen=best_frozen,
             last_validation_episode=log["val_episode"][-1] if log["val_episode"] else None,
         ),
     )
@@ -785,6 +891,12 @@ def main():
     parser.add_argument("--val-episodes", type=int, default=C.VALIDATION_EPISODES)
     parser.add_argument("--val-interval", type=int, default=C.VALIDATION_INTERVAL)
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
+    parser.add_argument("--val-smoothing-window", type=int, default=getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1))
+    parser.add_argument("--val-variance-penalty", type=float, default=getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0))
+    parser.add_argument("--best-freeze", dest="best_freeze", action="store_true", default=getattr(C, "BEST_FREEZE_ENABLED", False))
+    parser.add_argument("--no-best-freeze", dest="best_freeze", action="store_false")
+    parser.add_argument("--best-freeze-patience", type=int, default=getattr(C, "BEST_FREEZE_PATIENCE", 8))
+    parser.add_argument("--best-freeze-min-episodes", type=int, default=getattr(C, "BEST_FREEZE_MIN_EPISODES", 300))
     parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
     parser.add_argument("--val-oldest-coverage-floor", type=float, default=C.VALIDATION_OLDEST_COVERAGE_FLOOR)
     parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
