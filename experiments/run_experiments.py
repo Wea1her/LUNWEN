@@ -1224,8 +1224,9 @@ def _metric_winner_by_dimension(agg_main: dict) -> dict:
         ("block_fee_mean", True),
         ("fairness_mean", True),
         ("risk_exposure_mean", False),
-        ("top10_risk_mean", False),
+        ("edge10_risk_mean", False),  # main risk metric
         ("packing_ratio_mean", True),
+        ("top10_risk_mean", False),  # diagnostic only
         ("composite_score_mean", True),
         ("constrained_fee_score_mean", True),
         ("trade_score_mean", True),

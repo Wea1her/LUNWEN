@@ -107,11 +107,17 @@ RISK_ADJUSTED_FEE_LAMBDA = 0.40
 VALIDATION_EPISODES = 64
 VALIDATION_INTERVAL = 50
 VALIDATION_METRIC = "two_stage"
-LOWER_IS_BETTER_METRICS = ("risk_exposure", "starvation_gap", "top10_risk")
+LOWER_IS_BETTER_METRICS = (
+    "risk_exposure",
+    "edge10_risk",
+    "starvation_gap",
+    "top10_risk",  # diagnostic only
+)
 VALIDATION_FAIRNESS_FLOOR = 0.90
 VALIDATION_RISK_CEIL = 0.30
 VALIDATION_OLDEST_COVERAGE_FLOOR = 0.90
-VALIDATION_TOP10_RISK_CEIL = 0.30
+VALIDATION_TOP10_RISK_CEIL = 0.30  # diagnostic only
+VALIDATION_EDGE10_RISK_CEIL = 0.30  # main risk metric for head/tail sensitive regions
 VALIDATION_SEED_OFFSET = 10000
 BEST_CHECKPOINT_NAME = "best_model.pt"
 FINAL_CHECKPOINT_NAME = "final_model.pt"
@@ -154,7 +160,7 @@ OPERATING_MODE_WEIGHTS = {
 # ========== 多目标折中得分 ==========
 TRADE_SCORE_POLICY_VERSION = "v20260701_plan_multi_objective"
 TRADE_SCORE_RISK_REF = VALIDATION_RISK_CEIL
-TRADE_SCORE_EDGE_REF = VALIDATION_TOP10_RISK_CEIL
+TRADE_SCORE_EDGE_REF = VALIDATION_EDGE10_RISK_CEIL  # use edge10 instead of top10
 TRADE_SCORE_WEIGHTS = {
     "fee": 0.25,
     "fairness": 0.20,
