@@ -277,7 +277,31 @@ def _curriculum_env_kwargs(base_env_kwargs: dict, args: argparse.Namespace, stag
             C.TERMINAL_TOP10_RISK_WEIGHT,
         ) * 1.2
         kwargs["fairness_gate_min"] = max(kwargs.get("fairness_gate_min", C.FAIRNESS_GATE_MIN), 0.45)
+    elif stage == 3:
+        kwargs["gamma_r"] = kwargs.get("gamma_r", C.GAMMA_R) * getattr(
+            C, "CURRICULUM_STAGE3_GAMMA_R_MULT", 1.0
+        )
+        kwargs["terminal_risk_exposure_weight"] = kwargs.get(
+            "terminal_risk_exposure_weight",
+            C.TERMINAL_RISK_EXPOSURE_WEIGHT,
+        ) * getattr(C, "CURRICULUM_STAGE3_TERMINAL_RISK_MULT", 1.0)
+        kwargs["terminal_top10_risk_weight"] = kwargs.get(
+            "terminal_top10_risk_weight",
+            C.TERMINAL_TOP10_RISK_WEIGHT,
+        ) * getattr(C, "CURRICULUM_STAGE3_TERMINAL_TOP10_MULT", 1.0)
+        kwargs["fairness_gate_min"] = max(
+            kwargs.get("fairness_gate_min", C.FAIRNESS_GATE_MIN),
+            getattr(C, "CURRICULUM_STAGE3_FAIRNESS_GATE_MIN", C.FAIRNESS_GATE_MIN),
+        )
     return kwargs
+
+
+def _lr_scale_for_stage(args: argparse.Namespace, stage: int) -> float:
+    if not getattr(args, "lr_schedule", getattr(C, "LR_SCHEDULE_ENABLED", False)):
+        return 1.0
+    scales = tuple(getattr(args, "lr_stage_scales", getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2))))
+    idx = max(min(int(stage), len(scales)), 1) - 1
+    return float(scales[idx])
 
 
 def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
@@ -348,6 +372,8 @@ def train(args, env_kwargs: dict | None = None):
     args.curriculum = curriculum_enabled
     args.curriculum_stage_episodes = curriculum_cuts
     args.fairness_first = fairness_first
+    args.lr_schedule = bool(getattr(args, "lr_schedule", getattr(C, "LR_SCHEDULE_ENABLED", False)))
+    args.lr_stage_scales = tuple(getattr(args, "lr_stage_scales", getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2))))
     active_env_kwargs = _curriculum_env_kwargs(base_env_kwargs, args, current_stage)
     train_pool_seed = args.seed + getattr(C, "TRAIN_POOL_SEED_OFFSET", 0)
     env = TxOrderingEnv(
@@ -359,6 +385,8 @@ def train(args, env_kwargs: dict | None = None):
 
     model = ActorCritic().to(device)
     trainer = PPOTrainer(model, device=device)
+    current_lr_scale = _lr_scale_for_stage(args, current_stage)
+    trainer.set_lr_scale(current_lr_scale)
     buffer = RolloutBuffer()
 
     warmstart_history = _behavior_clone_warmstart(
@@ -390,6 +418,7 @@ def train(args, env_kwargs: dict | None = None):
         "proxy_packing_reward": [],
         "proxy_unused_gas_penalty": [],
         "proxy_fairness_gate": [],
+        "lr_scale": [],
         "val_episode": [],
         "val_metric": [],
         "val_score": [],
@@ -488,7 +517,14 @@ def train(args, env_kwargs: dict | None = None):
                 seed=train_pool_seed,
                 **active_env_kwargs,
             )
-            log["stage_switches"].append({"episode": ep, "stage": current_stage})
+            current_lr_scale = _lr_scale_for_stage(args, current_stage)
+            trainer.set_lr_scale(current_lr_scale)
+            log["stage_switches"].append({
+                "episode": ep,
+                "stage": current_stage,
+                "lr_scale": current_lr_scale,
+                "env_kwargs": active_env_kwargs,
+            })
 
         if training_pools is not None:
             obs, _ = env.reset_with_pool(training_pools[ep - 1])
@@ -539,6 +575,7 @@ def train(args, env_kwargs: dict | None = None):
         log["proxy_packing_reward"].append(info.get("proxy_packing_reward", 0.0))
         log["proxy_unused_gas_penalty"].append(info.get("proxy_unused_gas_penalty", 0.0))
         log["proxy_fairness_gate"].append(info.get("proxy_fairness_gate", 1.0))
+        log["lr_scale"].append(current_lr_scale)
         _write_training_progress(
             args.output,
             _progress_payload(
@@ -681,6 +718,10 @@ def train(args, env_kwargs: dict | None = None):
                 "stage_episode_cuts": list(curriculum_cuts),
                 "stage_switches": log["stage_switches"],
             },
+            "lr_schedule": {
+                "enabled": args.lr_schedule,
+                "stage_scales": list(args.lr_stage_scales),
+            },
             "multi_checkpoints": {
                 name: {
                     "file": payload["file"],
@@ -758,6 +799,8 @@ def main():
     parser.add_argument("--fairness-first", dest="fairness_first", action="store_true",
                         default=getattr(C, "FAIRNESS_FIRST_CURRICULUM_ENABLED", True))
     parser.add_argument("--no-fairness-first", dest="fairness_first", action="store_false")
+    parser.add_argument("--lr-schedule", action="store_true", default=getattr(C, "LR_SCHEDULE_ENABLED", False))
+    parser.add_argument("--lr-stage-scales", type=float, nargs=3, default=getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2)))
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)

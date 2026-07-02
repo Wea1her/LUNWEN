@@ -86,6 +86,24 @@ RISK_TUNING_FIELDS = {
 }
 
 
+def _normalize_sequence(values) -> list[float]:
+    return [float(v) for v in values]
+
+
+def _training_schedule_payload(args: argparse.Namespace) -> dict:
+    return {
+        "curriculum": bool(getattr(args, "curriculum", False)),
+        "curriculum_stage_episodes": _normalize_sequence(
+            getattr(args, "curriculum_stage_episodes", getattr(C, "CURRICULUM_STAGE_EPISODES", (0.3, 0.7, 1.0)))
+        ),
+        "fairness_first": bool(getattr(args, "fairness_first", True)),
+        "lr_schedule": bool(getattr(args, "lr_schedule", getattr(C, "LR_SCHEDULE_ENABLED", False))),
+        "lr_stage_scales": _normalize_sequence(
+            getattr(args, "lr_stage_scales", getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2)))
+        ),
+    }
+
+
 def _risk_tuning_payload(args: argparse.Namespace) -> dict:
     payload = {}
     label = getattr(args, "risk_tune_label", None)
@@ -617,6 +635,7 @@ def run_single_seed(seed, args_dict):
     """单个种子: 训练 + 分阶段评估 (独立进程)"""
     args = argparse.Namespace(**args_dict)
     risk_tuning = _apply_risk_tuning_overrides(args)
+    training_schedule = _training_schedule_payload(args)
     if isinstance(getattr(args, "device_map", None), dict) and seed in args.device_map:
         args.device = args.device_map[seed]
     stages = set(args.stages)
@@ -643,6 +662,8 @@ def run_single_seed(seed, args_dict):
     }
     if risk_tuning:
         seed_summary["risk_tuning"] = risk_tuning
+    if training_schedule["curriculum"] or training_schedule["lr_schedule"]:
+        seed_summary["training_schedule"] = training_schedule
     timing = {
         "train": 0.0,
         "eval": 0.0,
@@ -687,6 +708,8 @@ def run_single_seed(seed, args_dict):
             curriculum=args.curriculum,
             curriculum_stage_episodes=args.curriculum_stage_episodes,
             fairness_first=args.fairness_first,
+            lr_schedule=args.lr_schedule,
+            lr_stage_scales=args.lr_stage_scales,
             operating_mode=args.operating_mode,
         )
         t0 = time.perf_counter()
@@ -1819,7 +1842,7 @@ def main():
     parser.add_argument("--val-edge10-risk-ceil", type=float, default=C.VALIDATION_EDGE10_RISK_CEIL)
     parser.add_argument("--val-top10-risk-ceil", type=float, default=C.VALIDATION_TOP10_RISK_CEIL)
     parser.add_argument("--risk-tune-label", type=str, default="",
-                        help="风险增强预验标签，如 A/B/C")
+                        help="风险增强预验标签")
     parser.add_argument("--gamma-r", type=float, default=None,
                         help="覆盖训练环境的风险惩罚权重 GAMMA_R")
     parser.add_argument("--terminal-risk-exposure-weight", type=float, default=None,
@@ -1837,6 +1860,11 @@ def main():
     parser.add_argument("--fairness-first", dest="fairness_first", action="store_true",
                         default=getattr(C, "FAIRNESS_FIRST_CURRICULUM_ENABLED", True))
     parser.add_argument("--no-fairness-first", dest="fairness_first", action="store_false")
+    parser.add_argument("--lr-schedule", action="store_true", default=getattr(C, "LR_SCHEDULE_ENABLED", False),
+                        help="启用按 curriculum stage 衰减 PPO 学习率")
+    parser.add_argument("--lr-stage-scales", type=float, nargs=3,
+                        default=getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2)),
+                        help="三个 curriculum stage 的学习率倍率")
     args = parser.parse_args()
     if hasattr(C, "resolve_constraints"):
         eval_cons = C.resolve_constraints(profile=args.constraint_profile, for_training=False)
@@ -1853,6 +1881,7 @@ def main():
         if args.val_top10_risk_ceil == C.VALIDATION_TOP10_RISK_CEIL:
             args.val_top10_risk_ceil = float(eval_cons.get("top10_risk_ceil", args.val_top10_risk_ceil))
     risk_tuning = _apply_risk_tuning_overrides(args)
+    training_schedule = _training_schedule_payload(args)
     _resolve_stages(args)
     _apply_track_defaults(args)
     args.device_map = _parse_device_map(args.device_map)
@@ -1895,6 +1924,8 @@ def main():
     )
     if risk_tuning:
         print(f"Risk tuning: {risk_tuning}")
+    if training_schedule["curriculum"] or training_schedule["lr_schedule"]:
+        print(f"Training schedule: {training_schedule}")
     if args.device_map:
         print(f"Device map: {args.device_map}")
 
@@ -1934,6 +1965,7 @@ def main():
             "top10_risk_ceil": args.val_top10_risk_ceil,
         },
         "risk_tuning": risk_tuning,
+        "training_schedule": training_schedule,
         "config_snapshot": os.path.basename(config_snapshot_path),
         "seeds": args.seeds,
         "seed_runs": [],
@@ -2432,6 +2464,7 @@ def main():
             "episode_level_tests_are_diagnostic_only": True,
             "multiple_comparison_correction": "Holm-Bonferroni",
         },
+        "training_schedule": training_schedule,
         "tradeoff_score_protocol": {
             "policy_version": getattr(C, "TRADE_SCORE_POLICY_VERSION", "unknown"),
             "trade_score_weights": getattr(C, "TRADE_SCORE_WEIGHTS", {}),

@@ -70,14 +70,22 @@ class PPOTrainer:
         self.entropy_coef = entropy_coef
         self.device = device
 
-        self.optimizer = torch.optim.Adam([
+        param_groups = [
             {"params": model.encoder.parameters(), "lr": lr_actor},
             {"params": model.actor_fc.parameters(), "lr": lr_actor},
             {"params": model.actor_score.parameters(), "lr": lr_actor},
             {"params": [model.stop_embed], "lr": lr_actor},
             {"params": model.critic_fc.parameters(), "lr": lr_critic},
             {"params": model.critic_val.parameters(), "lr": lr_critic},
-        ])
+        ]
+        self._base_lrs = [group["lr"] for group in param_groups]
+        self.optimizer = torch.optim.Adam(param_groups)
+
+    def set_lr_scale(self, scale: float) -> None:
+        """Scale all optimizer group learning rates from their initial values."""
+        scale = float(scale)
+        for group, base_lr in zip(self.optimizer.param_groups, self._base_lrs):
+            group["lr"] = base_lr * scale
 
     def update(self, buffer: RolloutBuffer):
         """执行 PPO 更新, 返回 (actor_loss, critic_loss, entropy)"""
