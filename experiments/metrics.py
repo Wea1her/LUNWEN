@@ -573,8 +573,10 @@ def summary_metric_bundle(metrics_seq: list[dict],
 
 
 def risk_adjusted_fee_score(metrics: dict,
-                            lambda_risk: float = C.RISK_ADJUSTED_FEE_LAMBDA) -> float:
+                            lambda_risk: float | None = None) -> float:
     """风险调整收益分：fee_norm - λ·risk_exposure。"""
+    if lambda_risk is None:
+        lambda_risk = C.RISK_ADJUSTED_FEE_LAMBDA
     fee_norm = float(metrics.get("block_fee_norm", 0.0))
     risk = float(np.clip(metrics.get("risk_exposure", 0.0), 0.0, 1.0))
     return fee_norm - lambda_risk * risk

@@ -78,6 +78,45 @@ def _shared_pool_path(output_dir: str, role: str, filename: str) -> str:
     return path
 
 
+RISK_TUNING_FIELDS = {
+    "gamma_r": "GAMMA_R",
+    "terminal_risk_exposure_weight": "TERMINAL_RISK_EXPOSURE_WEIGHT",
+    "terminal_top10_risk_weight": "TERMINAL_TOP10_RISK_WEIGHT",
+    "risk_adjusted_fee_lambda": "RISK_ADJUSTED_FEE_LAMBDA",
+}
+
+
+def _risk_tuning_payload(args: argparse.Namespace) -> dict:
+    payload = {}
+    label = getattr(args, "risk_tune_label", None)
+    if label:
+        payload["label"] = label
+    for attr, const_name in RISK_TUNING_FIELDS.items():
+        value = getattr(args, attr, None)
+        if value is not None:
+            payload[attr] = float(value)
+            payload[f"baseline_{attr}"] = float(getattr(C, const_name))
+    return payload
+
+
+def _apply_risk_tuning_overrides(args: argparse.Namespace) -> dict:
+    payload = _risk_tuning_payload(args)
+    for attr, const_name in RISK_TUNING_FIELDS.items():
+        value = getattr(args, attr, None)
+        if value is not None:
+            setattr(C, const_name, float(value))
+    return payload
+
+
+def _risk_env_kwargs_from_args(args: argparse.Namespace) -> dict:
+    env_kwargs = {}
+    for attr in ("gamma_r", "terminal_risk_exposure_weight", "terminal_top10_risk_weight"):
+        value = getattr(args, attr, None)
+        if value is not None:
+            env_kwargs[attr] = float(value)
+    return env_kwargs
+
+
 def _get_or_create_shared_pools(
     path: str,
     n_episodes: int,
@@ -538,6 +577,7 @@ def _prepare_baseline_params_for_seed(seed: int, args: argparse.Namespace, resul
         "fairness_floor": args.val_fairness_floor,
         "oldest_coverage_floor": args.val_oldest_coverage_floor,
         "risk_ceil": args.val_risk_ceil,
+        "edge10_risk_ceil": args.val_edge10_risk_ceil,
         "top10_risk_ceil": args.val_top10_risk_ceil,
     }
     tuning, best_params = grid_search_baseline_params(
@@ -576,6 +616,7 @@ def _prepare_baseline_params_for_seed(seed: int, args: argparse.Namespace, resul
 def run_single_seed(seed, args_dict):
     """单个种子: 训练 + 分阶段评估 (独立进程)"""
     args = argparse.Namespace(**args_dict)
+    risk_tuning = _apply_risk_tuning_overrides(args)
     if isinstance(getattr(args, "device_map", None), dict) and seed in args.device_map:
         args.device = args.device_map[seed]
     stages = set(args.stages)
@@ -600,6 +641,8 @@ def run_single_seed(seed, args_dict):
         "requested_device": args.device,
         "resolved_device": str(device),
     }
+    if risk_tuning:
+        seed_summary["risk_tuning"] = risk_tuning
     timing = {
         "train": 0.0,
         "eval": 0.0,
@@ -613,7 +656,7 @@ def run_single_seed(seed, args_dict):
     if not args.skip_train:
         print(f"[seed={seed}] 开始训练", flush=True)
         seed_everything(seed)
-        train_env_kwargs = {}
+        train_env_kwargs = _risk_env_kwargs_from_args(args)
         if hasattr(C, "resolve_constraints"):
             train_cons = C.resolve_constraints(profile=args.training_constraint_profile, for_training=True)
             train_env_kwargs["fairness_gate_threshold"] = float(
@@ -636,6 +679,7 @@ def run_single_seed(seed, args_dict):
             val_fairness_floor=args.val_fairness_floor,
             val_oldest_coverage_floor=args.val_oldest_coverage_floor,
             val_risk_ceil=args.val_risk_ceil,
+            val_edge10_risk_ceil=args.val_edge10_risk_ceil,
             val_top10_risk_ceil=args.val_top10_risk_ceil,
             pretrain_policy=args.pretrain_policy,
             pretrain_epochs=args.pretrain_epochs,
@@ -1772,7 +1816,18 @@ def main():
     parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
     parser.add_argument("--val-oldest-coverage-floor", type=float, default=C.VALIDATION_OLDEST_COVERAGE_FLOOR)
     parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
+    parser.add_argument("--val-edge10-risk-ceil", type=float, default=C.VALIDATION_EDGE10_RISK_CEIL)
     parser.add_argument("--val-top10-risk-ceil", type=float, default=C.VALIDATION_TOP10_RISK_CEIL)
+    parser.add_argument("--risk-tune-label", type=str, default="",
+                        help="风险增强预验标签，如 A/B/C")
+    parser.add_argument("--gamma-r", type=float, default=None,
+                        help="覆盖训练环境的风险惩罚权重 GAMMA_R")
+    parser.add_argument("--terminal-risk-exposure-weight", type=float, default=None,
+                        help="覆盖终止风险暴露惩罚权重")
+    parser.add_argument("--terminal-top10-risk-weight", type=float, default=None,
+                        help="覆盖终止 top/edge 风险惩罚权重")
+    parser.add_argument("--risk-adjusted-fee-lambda", type=float, default=None,
+                        help="覆盖风险调整收益分中的风险惩罚系数")
     parser.add_argument("--pretrain-policy", type=str, default=C.PRETRAIN_POLICY,
                         choices=["none", "fifo", "fair_fee", "mixed"])
     parser.add_argument("--pretrain-epochs", type=int, default=C.PRETRAIN_EPOCHS)
@@ -1793,8 +1848,11 @@ def main():
             )
         if args.val_risk_ceil == C.VALIDATION_RISK_CEIL:
             args.val_risk_ceil = float(eval_cons.get("risk_ceil", args.val_risk_ceil))
+        if args.val_edge10_risk_ceil == C.VALIDATION_EDGE10_RISK_CEIL:
+            args.val_edge10_risk_ceil = float(eval_cons.get("edge10_risk_ceil", args.val_edge10_risk_ceil))
         if args.val_top10_risk_ceil == C.VALIDATION_TOP10_RISK_CEIL:
             args.val_top10_risk_ceil = float(eval_cons.get("top10_risk_ceil", args.val_top10_risk_ceil))
+    risk_tuning = _apply_risk_tuning_overrides(args)
     _resolve_stages(args)
     _apply_track_defaults(args)
     args.device_map = _parse_device_map(args.device_map)
@@ -1832,8 +1890,11 @@ def main():
         "Validation protocol: "
         f"metric={args.val_metric}, fairness>={args.val_fairness_floor}, "
         f"oldest_cov>={args.val_oldest_coverage_floor}, risk<={args.val_risk_ceil}, "
+        f"edge10_risk<={args.val_edge10_risk_ceil}, "
         f"top10_risk<={args.val_top10_risk_ceil}"
     )
+    if risk_tuning:
+        print(f"Risk tuning: {risk_tuning}")
     if args.device_map:
         print(f"Device map: {args.device_map}")
 
@@ -1869,8 +1930,10 @@ def main():
             "fairness_floor": args.val_fairness_floor,
             "oldest_coverage_floor": args.val_oldest_coverage_floor,
             "risk_ceil": args.val_risk_ceil,
+            "edge10_risk_ceil": args.val_edge10_risk_ceil,
             "top10_risk_ceil": args.val_top10_risk_ceil,
         },
+        "risk_tuning": risk_tuning,
         "config_snapshot": os.path.basename(config_snapshot_path),
         "seeds": args.seeds,
         "seed_runs": [],
@@ -2374,6 +2437,7 @@ def main():
             "trade_score_weights": getattr(C, "TRADE_SCORE_WEIGHTS", {}),
             "risk_aware_trade_score_weights": getattr(C, "RISK_AWARE_TRADE_SCORE_WEIGHTS", {}),
             "risk_ref": getattr(C, "TRADE_SCORE_RISK_REF", None),
+            "risk_tuning": risk_tuning,
             "edge_ref": getattr(C, "TRADE_SCORE_EDGE_REF", None),
             "constrained_thresholds": {
                 "fairness_min": getattr(C, "CONSTRAINED_TRADE_FAIRNESS_MIN", None),

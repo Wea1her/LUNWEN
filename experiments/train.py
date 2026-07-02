@@ -306,7 +306,7 @@ def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
             fee_norm
             * max(fairness, 0.0)
             * max(1.0 - risk, 0.0)
-            * max(1.0 - top10, 0.0)
+            * max(1.0 - edge10, 0.0)
             * max(oldest, 1e-6)
         ),
         "trade_score": float(agg.get("trade_score_mean", 0.0)),
@@ -645,6 +645,10 @@ def train(args, env_kwargs: dict | None = None):
                     "generation_seed": validation_seed,
                     "episodes": args.val_episodes,
                 },
+            },
+            "reward_config": {
+                "env_kwargs": base_env_kwargs,
+                "risk_adjusted_fee_lambda": C.RISK_ADJUSTED_FEE_LAMBDA,
             },
             "selection_rule": {
                 "type": "fixed_validation_pool",
