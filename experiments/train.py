@@ -66,6 +66,7 @@ def _progress_payload(
         "val_interval": int(args.val_interval),
         "val_episodes": int(args.val_episodes),
         "val_metric": str(args.val_metric),
+        "best_selection_min_episode": int(getattr(args, "best_selection_min_episodes", getattr(C, "BEST_SELECTION_MIN_EPISODES", 0))),
         "best_episode": best_episode,
         "best_score": best_score,
         "last_validation_episode": last_validation_episode,
@@ -409,6 +410,7 @@ def train(args, env_kwargs: dict | None = None):
     args.lr_stage_scales = tuple(getattr(args, "lr_stage_scales", getattr(C, "LR_STAGE_SCALES", (1.0, 0.5, 0.2))))
     args.val_smoothing_window = max(1, int(getattr(args, "val_smoothing_window", getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1))))
     args.val_variance_penalty = max(0.0, float(getattr(args, "val_variance_penalty", getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0))))
+    args.best_selection_min_episodes = max(0, int(getattr(args, "best_selection_min_episodes", getattr(C, "BEST_SELECTION_MIN_EPISODES", 0))))
     args.best_freeze = bool(getattr(args, "best_freeze", getattr(C, "BEST_FREEZE_ENABLED", False)))
     args.best_freeze_patience = max(1, int(getattr(args, "best_freeze_patience", getattr(C, "BEST_FREEZE_PATIENCE", 8))))
     args.best_freeze_min_episodes = max(0, int(getattr(args, "best_freeze_min_episodes", getattr(C, "BEST_FREEZE_MIN_EPISODES", 300))))
@@ -464,6 +466,8 @@ def train(args, env_kwargs: dict | None = None):
         "val_score_mean": [],
         "val_score_std": [],
         "val_selection_window_count": [],
+        "val_selection_window_ready": [],
+        "val_selection_episode_ready": [],
         "val_selection_ready": [],
         "val_best_frozen": [],
         "val_no_improvement_count": [],
@@ -530,6 +534,7 @@ def train(args, env_kwargs: dict | None = None):
         "validation_top10_risk_ceil": args.val_top10_risk_ceil,  # diagnostic
         "selection_smoothing_window": args.val_smoothing_window,
         "selection_variance_penalty": args.val_variance_penalty,
+        "selection_min_episode": args.best_selection_min_episodes,
         "best_freeze_enabled": args.best_freeze,
         "best_freeze_patience": args.best_freeze_patience,
         "best_freeze_min_episodes": args.best_freeze_min_episodes,
@@ -692,11 +697,15 @@ def train(args, env_kwargs: dict | None = None):
                 args.val_variance_penalty,
             )
             selection_score = float(selection["score"])
-            selection_ready = selection["count"] >= args.val_smoothing_window or ep == args.episodes
+            window_ready = selection["count"] >= args.val_smoothing_window
+            episode_ready = ep >= args.best_selection_min_episodes or ep == args.episodes
+            selection_ready = (window_ready and episode_ready) or ep == args.episodes
             log["val_selection_score"].append(selection_score)
             log["val_score_mean"].append(selection["mean"])
             log["val_score_std"].append(selection["std"])
             log["val_selection_window_count"].append(selection["count"])
+            log["val_selection_window_ready"].append(bool(window_ready))
+            log["val_selection_episode_ready"].append(bool(episode_ready))
             log["val_selection_ready"].append(bool(selection_ready))
 
             if selection_ready and not best_frozen:
@@ -789,6 +798,8 @@ def train(args, env_kwargs: dict | None = None):
                 "raw_score_log_key": "val_score",
                 "smoothing_window": args.val_smoothing_window,
                 "variance_penalty": args.val_variance_penalty,
+                "selection_min_episode": args.best_selection_min_episodes,
+                "final_episode_fallback": True,
                 "best_freeze_enabled": args.best_freeze,
                 "best_freeze_patience": args.best_freeze_patience,
                 "best_freeze_min_episodes": args.best_freeze_min_episodes,
@@ -893,6 +904,7 @@ def main():
     parser.add_argument("--val-metric", type=str, default=C.VALIDATION_METRIC)
     parser.add_argument("--val-smoothing-window", type=int, default=getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1))
     parser.add_argument("--val-variance-penalty", type=float, default=getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0))
+    parser.add_argument("--best-selection-min-episodes", type=int, default=getattr(C, "BEST_SELECTION_MIN_EPISODES", 0))
     parser.add_argument("--best-freeze", dest="best_freeze", action="store_true", default=getattr(C, "BEST_FREEZE_ENABLED", False))
     parser.add_argument("--no-best-freeze", dest="best_freeze", action="store_false")
     parser.add_argument("--best-freeze-patience", type=int, default=getattr(C, "BEST_FREEZE_PATIENCE", 8))

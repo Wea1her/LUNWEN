@@ -109,6 +109,8 @@ def _checkpoint_selection_payload(args: argparse.Namespace) -> dict:
         "type": "smoothed_stability_validation_score",
         "smoothing_window": int(getattr(args, "val_smoothing_window", getattr(C, "VALIDATION_SMOOTHING_WINDOW", 1))),
         "variance_penalty": float(getattr(args, "val_variance_penalty", getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0))),
+        "selection_min_episode": int(getattr(args, "best_selection_min_episodes", getattr(C, "BEST_SELECTION_MIN_EPISODES", 0))),
+        "final_episode_fallback": True,
         "best_freeze": bool(getattr(args, "best_freeze", getattr(C, "BEST_FREEZE_ENABLED", False))),
         "best_freeze_patience": int(getattr(args, "best_freeze_patience", getattr(C, "BEST_FREEZE_PATIENCE", 8))),
         "best_freeze_min_episodes": int(getattr(args, "best_freeze_min_episodes", getattr(C, "BEST_FREEZE_MIN_EPISODES", 300))),
@@ -712,6 +714,7 @@ def run_single_seed(seed, args_dict):
             val_metric=args.val_metric,
             val_smoothing_window=args.val_smoothing_window,
             val_variance_penalty=args.val_variance_penalty,
+            best_selection_min_episodes=args.best_selection_min_episodes,
             best_freeze=args.best_freeze,
             best_freeze_patience=args.best_freeze_patience,
             best_freeze_min_episodes=args.best_freeze_min_episodes,
@@ -1858,6 +1861,9 @@ def main():
                         help="用于 best checkpoint selection 的验证分数移动平均窗口")
     parser.add_argument("--val-variance-penalty", type=float, default=getattr(C, "VALIDATION_VARIANCE_PENALTY", 0.0),
                         help="best checkpoint selection 的验证分数标准差惩罚系数")
+    parser.add_argument("--best-selection-min-episodes", type=int,
+                        default=getattr(C, "BEST_SELECTION_MIN_EPISODES", 0),
+                        help="允许更新 best checkpoint 的最小训练 episode；最终 episode 作为短跑兜底仍可保存")
     parser.add_argument("--best-freeze", dest="best_freeze", action="store_true",
                         default=getattr(C, "BEST_FREEZE_ENABLED", False),
                         help="验证分数长期无提升后冻结 best checkpoint")
