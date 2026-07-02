@@ -310,7 +310,8 @@ def _resolve_constraints(constraints: dict | None = None) -> dict:
         "fairness_floor": C.VALIDATION_FAIRNESS_FLOOR,
         "oldest_coverage_floor": C.VALIDATION_OLDEST_COVERAGE_FLOOR,
         "risk_ceil": C.VALIDATION_RISK_CEIL,
-        "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,
+        "edge10_risk_ceil": C.VALIDATION_EDGE10_RISK_CEIL,
+        "top10_risk_ceil": C.VALIDATION_TOP10_RISK_CEIL,  # diagnostic
     }
 
 
@@ -318,16 +319,16 @@ def _is_feasible(metrics: dict, constraints: dict) -> bool:
     fairness_floor = float(constraints.get("fairness_floor", C.VALIDATION_FAIRNESS_FLOOR))
     oldest_floor = float(constraints.get("oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR))
     risk_ceil = float(constraints.get("risk_ceil", C.VALIDATION_RISK_CEIL))
-    top10_risk_ceil = float(constraints.get("top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL))
+    edge10_risk_ceil = float(constraints.get("edge10_risk_ceil", C.VALIDATION_EDGE10_RISK_CEIL))
     fairness = float(metrics.get("fairness", 0.0))
     oldest_cov = float(metrics.get("oldest_coverage", 0.0))
     risk = float(metrics.get("risk_exposure", 1.0))
-    top10_risk = float(metrics.get("top10_risk", 1.0))
+    edge10_risk = float(metrics.get("edge10_risk", 1.0))
     return (
         fairness >= fairness_floor
         and oldest_cov >= oldest_floor
         and risk <= risk_ceil
-        and top10_risk <= top10_risk_ceil
+        and edge10_risk <= edge10_risk_ceil
     )
 
 
@@ -338,13 +339,13 @@ def violation_breakdown(metrics_seq: list[dict],
     fairness_floor = float(cons.get("fairness_floor", C.VALIDATION_FAIRNESS_FLOOR))
     oldest_floor = float(cons.get("oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR))
     risk_ceil = float(cons.get("risk_ceil", C.VALIDATION_RISK_CEIL))
-    top10_risk_ceil = float(cons.get("top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL))
+    edge10_risk_ceil = float(cons.get("edge10_risk_ceil", C.VALIDATION_EDGE10_RISK_CEIL))
 
     breakdown = {
         "fairness_floor": 0,
         "oldest_coverage_floor": 0,
         "risk_ceil": 0,
-        "top10_risk_ceil": 0,
+        "edge10_risk_ceil": 0,
         "any_violation": 0,
     }
     for metrics in metrics_seq:
@@ -358,8 +359,8 @@ def violation_breakdown(metrics_seq: list[dict],
         if float(metrics.get("risk_exposure", 1.0)) > risk_ceil:
             breakdown["risk_ceil"] += 1
             violated = True
-        if float(metrics.get("top10_risk", 1.0)) > top10_risk_ceil:
-            breakdown["top10_risk_ceil"] += 1
+        if float(metrics.get("edge10_risk", 1.0)) > edge10_risk_ceil:
+            breakdown["edge10_risk_ceil"] += 1
             violated = True
         if violated:
             breakdown["any_violation"] += 1
@@ -543,7 +544,7 @@ def summary_metric_bundle(metrics_seq: list[dict],
     }
     low_variance_flags = [m for m, c in effective_variance_checks.items() if c.get("is_low_variance")]
     top_violation = max(
-        ("fairness_floor", "oldest_coverage_floor", "risk_ceil", "top10_risk_ceil"),
+        ("fairness_floor", "oldest_coverage_floor", "risk_ceil", "edge10_risk_ceil"),
         key=lambda k: vb[k],
     ) if metrics_seq else "none"
     return {

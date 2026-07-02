@@ -97,19 +97,19 @@ def _run_validation(model: ActorCritic,
         "fairness_floor": getattr(args, "val_fairness_floor", C.VALIDATION_FAIRNESS_FLOOR),
         "oldest_coverage_floor": getattr(args, "val_oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR),
         "risk_ceil": getattr(args, "val_risk_ceil", C.VALIDATION_RISK_CEIL),
-        "top10_risk_ceil": getattr(args, "val_top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL),
+        "edge10_risk_ceil": getattr(args, "val_edge10_risk_ceil", C.VALIDATION_EDGE10_RISK_CEIL),
     })
     if args.val_metric == "constrained_fee":
         fee = float(agg.get("block_fee_mean", 0.0))
         fairness = float(agg.get("fairness_mean", 0.0))
         oldest_cov = float(agg.get("oldest_coverage_mean", 0.0))
         risk = float(agg.get("risk_exposure_mean", 1.0))
-        top10_risk = float(agg.get("top10_risk_mean", 1.0))
+        edge10_risk = float(agg.get("edge10_risk_mean", 1.0))
         feasible = (
             fairness >= getattr(args, "val_fairness_floor", C.VALIDATION_FAIRNESS_FLOOR)
             and oldest_cov >= getattr(args, "val_oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR)
             and risk <= getattr(args, "val_risk_ceil", C.VALIDATION_RISK_CEIL)
-            and top10_risk <= getattr(args, "val_top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL)
+            and edge10_risk <= getattr(args, "val_edge10_risk_ceil", C.VALIDATION_EDGE10_RISK_CEIL)
         )
         metric_key = "block_fee_mean"
         metric_value = fee
@@ -118,20 +118,20 @@ def _run_validation(model: ActorCritic,
         fee_norm = float(agg.get("block_fee_norm_mean", 0.0))
         fairness = float(np.clip(agg.get("fairness_mean", 0.0), 0.0, 1.0))
         risk = float(np.clip(agg.get("risk_exposure_mean", 1.0), 0.0, 1.0))
-        top10_risk = float(np.clip(agg.get("top10_risk_mean", 1.0), 0.0, 1.0))
+        edge10_risk = float(np.clip(agg.get("edge10_risk_mean", 1.0), 0.0, 1.0))
         oldest_cov = float(np.clip(agg.get("oldest_coverage_mean", 0.0), 0.0, 1.0))
         metric_key = "hypervolume_proxy"
-        metric_value = fee_norm * fairness * (1.0 - risk) * (1.0 - top10_risk) * oldest_cov
+        metric_value = fee_norm * fairness * (1.0 - risk) * (1.0 - edge10_risk) * oldest_cov
         score = metric_value
     elif args.val_metric == "pareto_score":
-        # 轻量 Pareto proxy：鼓励收益/公平/oldest 覆盖，不允许高风险与高top10_risk。
+        # 轻量 Pareto proxy：鼓励收益/公平/oldest 覆盖，不允许高风险与高edge10_risk。
         fee_norm = float(np.clip(agg.get("block_fee_norm_mean", 0.0), 0.0, 1.0))
         fairness = float(np.clip(agg.get("fairness_mean", 0.0), 0.0, 1.0))
         oldest = float(np.clip(agg.get("oldest_coverage_mean", 0.0), 0.0, 1.0))
         risk = float(np.clip(agg.get("risk_exposure_mean", 1.0), 0.0, 1.0))
-        top10 = float(np.clip(agg.get("top10_risk_mean", 1.0), 0.0, 1.0))
+        edge10 = float(np.clip(agg.get("edge10_risk_mean", 1.0), 0.0, 1.0))
         metric_key = "pareto_proxy"
-        metric_value = 0.3 * fee_norm + 0.25 * fairness + 0.25 * oldest + 0.1 * (1.0 - risk) + 0.1 * (1.0 - top10)
+        metric_value = 0.3 * fee_norm + 0.25 * fairness + 0.25 * oldest + 0.1 * (1.0 - risk) + 0.1 * (1.0 - edge10)
         score = metric_value
     elif args.val_metric == "two_stage":
         two_stage = two_stage_selection_score(
@@ -285,7 +285,7 @@ def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
     oldest = float(agg.get("oldest_coverage_mean", 0.0))
     starvation = float(agg.get("starvation_gap_mean", 1.0))
     risk = float(agg.get("risk_exposure_mean", 1.0))
-    top10 = float(agg.get("top10_risk_mean", 1.0))
+    edge10 = float(agg.get("edge10_risk_mean", 1.0))
     fee_norm = float(agg.get("block_fee_norm_mean", 0.0))
     constrained_fee = (
         fee_norm
@@ -293,14 +293,14 @@ def _multi_checkpoint_scores(agg: dict, args: argparse.Namespace) -> dict:
             fairness >= getattr(args, "val_fairness_floor", C.VALIDATION_FAIRNESS_FLOOR)
             and oldest >= getattr(args, "val_oldest_coverage_floor", C.VALIDATION_OLDEST_COVERAGE_FLOOR)
             and risk <= getattr(args, "val_risk_ceil", C.VALIDATION_RISK_CEIL)
-            and top10 <= getattr(args, "val_top10_risk_ceil", C.VALIDATION_TOP10_RISK_CEIL)
+            and edge10 <= getattr(args, "val_edge10_risk_ceil", C.VALIDATION_EDGE10_RISK_CEIL)
         )
         else -float("inf")
     )
     return {
         "fairness_recovery": fairness + 0.4 * oldest - 0.2 * starvation,
-        # 显式纳入 top10_risk，避免仅靠 risk_exposure 选模。
-        "risk_aligned": fairness - 0.8 * risk - 0.5 * top10,
+        # 显式纳入 edge10_risk，避免仅靠 risk_exposure 选模。
+        "risk_aligned": fairness - 0.8 * risk - 0.5 * edge10,
         "constrained_fee": constrained_fee,
         "hypervolume": (
             fee_norm
@@ -452,7 +452,8 @@ def train(args, env_kwargs: dict | None = None):
         "validation_fairness_floor": args.val_fairness_floor,
         "validation_oldest_coverage_floor": args.val_oldest_coverage_floor,
         "validation_risk_ceil": args.val_risk_ceil,
-        "validation_top10_risk_ceil": args.val_top10_risk_ceil,
+        "validation_edge10_risk_ceil": args.val_edge10_risk_ceil,
+        "validation_top10_risk_ceil": args.val_top10_risk_ceil,  # diagnostic
     })
     _write_training_progress(
         args.output,
@@ -657,7 +658,8 @@ def train(args, env_kwargs: dict | None = None):
                 "validation_fairness_floor": args.val_fairness_floor,
                 "validation_oldest_coverage_floor": args.val_oldest_coverage_floor,
                 "validation_risk_ceil": args.val_risk_ceil,
-                "validation_top10_risk_ceil": args.val_top10_risk_ceil,
+                "validation_edge10_risk_ceil": args.val_edge10_risk_ceil,
+                "validation_top10_risk_ceil": args.val_top10_risk_ceil,  # diagnostic
                 "best_episode": best_episode,
                 "best_metric_key": best_metric_key,
                 "best_metric_value": best_metric_value,
@@ -741,7 +743,8 @@ def main():
     parser.add_argument("--val-fairness-floor", type=float, default=C.VALIDATION_FAIRNESS_FLOOR)
     parser.add_argument("--val-oldest-coverage-floor", type=float, default=C.VALIDATION_OLDEST_COVERAGE_FLOOR)
     parser.add_argument("--val-risk-ceil", type=float, default=C.VALIDATION_RISK_CEIL)
-    parser.add_argument("--val-top10-risk-ceil", type=float, default=C.VALIDATION_TOP10_RISK_CEIL)
+    parser.add_argument("--val-edge10-risk-ceil", type=float, default=C.VALIDATION_EDGE10_RISK_CEIL)
+    parser.add_argument("--val-top10-risk-ceil", type=float, default=C.VALIDATION_TOP10_RISK_CEIL)  # diagnostic
     parser.add_argument("--pretrain-policy", type=str, default=C.PRETRAIN_POLICY,
                         choices=["none", "fifo", "fair_fee", "mixed"])
     parser.add_argument("--pretrain-epochs", type=int, default=C.PRETRAIN_EPOCHS)
